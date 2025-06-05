@@ -1,0 +1,99 @@
+# You will see *some* commands preceded by "echo y|"
+# This is because those commands apparently require confirmation to execute.
+# The  "echo y|" bypasses having to manually confirm each command.
+
+# Add new node
+wwctl node add c001 --ipaddr=172.16.0.101 --hwaddr 18:03:73:1c:77:b8 --ipmiaddr=172.16.4.101
+
+
+## After adding nodes, and setting profile and container, be sure to configure, or nothing will boot
+wwctl configure --all
+
+
+# Set a nodes container
+# This command will set node c001 to use the container called compute
+echo y|wwctl node set -C compute c001
+
+
+# Set a nodes profile
+echo y|wwctl node set -P compute c001
+
+
+## If a node has more than one profile, use a comma to separate:
+echo y|wwctl node set -P compute,amdkernel c001
+
+
+## Add RPM to a container
+## Get the path to the container root
+wwctl container list
+
+
+wwctl container show <container-name>
+/var/lib/warewulf/chroots/compute/rootfs
+
+## Set CHROOT to the correct path for the container you wish to modify
+CHROOT=/var/lib/warewulf/chroots/<container-name>/rootfs
+
+## Install the RPM
+dnf install -y --installroot=$CHROOT rpmname
+
+
+# After making changes to a container
+wwctl container build <container-name>
+
+## NOTE: If you miss the build step, the compressed image that the nodes boot will NOT be updated.
+## When you reboot, changes will not be part of the running image
+
+
+# Change MAC address for a node
+wwctl node set NODENAME --hwaddr ma:c:ad:re:ss
+
+# Be sure to update the DB after change
+wwctl configure --all
+
+# Change the ip address for a node
+wwctl node set --ipaddr 172.16.0.12 --netmask 255.255.252.0 NODENAME
+
+# Be sure to update the DB after change
+wwctl configure --all
+
+# To remove a node:
+wwctl node delete c001
+
+## Configure a GPU container
+## 
+Must change container from RO to RW
+ chmod u+w $(wwctl container show gpu)
+
+# Add Nvidia repo
+dnf config-manager --add-repo http://developer.download.nvidia.com/compute/cuda/repos/rhel9/x86_64/cuda-rhel9.repo
+
+wwctl container show gpu
+
+# Copy CUDA binary to /tmp in that path
+cp /root/cuda*.run /var/lib/warewulf/chroots/gpu/rootfs/tmp/
+
+# install necessary RPMs
+dnf localinstall -y datacenter-gpu-manager*.rpm --installroot=/var/lib/warewulf/chroots/gpu/rootfs
+dnf install -y --installroot=/var/lib/warewulf/chroots/gpu/rootfs apptainer apptainer-suid
+
+cp /etc/yum.repos.d/cuda-rhel9.repo /var/lib/warewulf/chroots/gpu/rootfs/etc/yum.repos.d/
+dnf install -y --installroot=/var/lib/warewulf/chroots/gpu/rootfs libnvshmem3-cuda-12 libnvshmem3-devel-cuda-12 libnvshmem3-static-cuda-12
+
+wwctl container shell gpu
+
+sh /tmp/cuda*.run --silent --driver
+rm -f /tmp/cuda*.run
+
+systemctl enable dcgm --now
+
+yum install -y https://github.com/warewulf/warewulf/releases/download/v4.5.8/warewulf-dracut-4.5.8-1.el9.noarch.rpm
+dracut --force --no-hostonly --add wwinit --regenerate-all
+exit
+# (image gets rebuilt)
+
+# run a for loop to set dracut on the nodes:
+for i in g{001..016}
+do
+echo y|wwctl node set $i --ipxe dracut
+done
