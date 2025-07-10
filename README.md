@@ -6,7 +6,7 @@
 This has been tested with Rocky 9.4 and 9.5, RHEL 9.4 and 9.5
 
 ## Deployment Folder Structure
-This document outlines the recommended directory structure for the deployment tool and its related artifacts.
+This document outlines the required directory structure for the deployment tool and its related files.
 
 📂 /root/wwdeploy/
 This is the main directory for the deployment tool itself. All the .sh script modules and your custom variable files should be placed here. You will run the deployment by navigating into this directory and executing bash deploy_warewulf.sh.
