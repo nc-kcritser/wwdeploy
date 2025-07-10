@@ -1,14 +1,11 @@
 # Dell-OpenHPC-Warewulf
 
-HPC deployment scripts for OpenHPC with Warewulf v4.5.8. 
---- 4.6.x will be handled in the 1.5 release.
+## HPC deployment scripts for OpenHPC with Warewulf v4.5.8. 
+** 4.6.x will be handled in the 1.5 release. **
 
-This has been tested with Rocky 9.4-9.5, RHEL 9.4-9.5
+This has been tested with Rocky 9.4 and 9.5, RHEL 9.4 and 9.5
 
-Deployment Folder Structure
-This document outlines the recommended directory structure for the deployment tool and its related artifacts.
-
-Deployment Folder Structure
+## Deployment Folder Structure
 This document outlines the recommended directory structure for the deployment tool and its related artifacts.
 
 📂 /root/wwdeploy/
