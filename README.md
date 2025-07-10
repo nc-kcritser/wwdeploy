@@ -1,6 +1,7 @@
 # Dell-OpenHPC-Warewulf
 
-HPC deployment scripts for OpenHPC with Warewulf v4.5.8
+HPC deployment scripts for OpenHPC with Warewulf v4.5.8. 
+--- 4.6.x will be handled in the 1.5 release.
 
 This has been tested with Rocky 9.4-9.5, RHEL 9.4-9.5
 
