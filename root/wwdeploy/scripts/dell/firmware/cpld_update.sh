@@ -23,11 +23,11 @@ RAC=/opt/dell/srvadmin/sbin/racadm
 
 ## Determine cluster management platform
 if [ -d /opt/ohpc/pub/apps/dell/firmware/PowerEdge ]; then
-	echo "Cluster manager is Warewulf!"
+	echo "Cluster manager is OpenHPC/Warewulf!"
 	sleep 2
 	fw_path=/opt/ohpc/pub/apps/dell/firmware/PowerEdge
 elif [ -d /cm/shared/apps/dell/firmware/PowerEdge ]; then
-	echo "Cluster manager is Bright!"
+	echo "Cluster manager is Base Command Manager/Bright!"
 	sleep 2
 	fw_path=/cm/shared/apps/dell/firmware/PowerEdge
 fi
