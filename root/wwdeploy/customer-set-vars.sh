@@ -1,10 +1,10 @@
 #!/usr/bin/bash
 
 #### Cluster General Information 
-cluster_name=prime                              # Name of the cluster
-sms_name=prime1                                 # Hostname for SMS server 
-external_domain=hpc-lab.org                     # External network domain name
-search_domains=hpc-lab.org                      # DNS search domains
+cluster_name=cluster                                # Name of the cluster
+sms_name=headnode1                                 # Hostname for SMS server 
+external_domain=hpc-lab.org                        # External network domain name
+search_domains=hpc-lab.org                         # DNS search domains
 
 # NTP server for time synchronization
 ntp_server=time.google.com
@@ -85,3 +85,5 @@ sysmgmtd_host=
 
 # Lustre MGS mount name
 mgs_fs_name=
+
+
