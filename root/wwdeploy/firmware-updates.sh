@@ -39,11 +39,11 @@ install_master_node_firmware() {
 
 	# Set executable perms on the BIN files
 	chmod +x -R ${fw_dir}/*.BIN
-	for i in `ls ${fw_dir}|grep iDRAC`; do sh ${fw_dir}/$i -q; done
+	for i in `ls ${fw_dir}|grep iDRAC`; do ${fw_dir}/$i -q; done
 	# Update everything else except iDRAC, BIOS and CPLD firmware
-	for i in `ls ${fw_dir}|grep BIN|grep -v BIOS|grep -v iDRAC|grep -v CPLD`; do sh ${fw_dir}/$i -q; done
+	for i in `ls ${fw_dir}|grep BIN|grep -v BIOS|grep -v iDRAC|grep -v CPLD`; do ${fw_dir}/$i -q; done
 	# Update BIOS and reboot
-	for i in `ls ${fw_dir}|grep BIN|grep BIOS`; do sh ${fw_dir}/$i -q -r; done
+	for i in `ls ${fw_dir}|grep BIN|grep BIOS`; do ${fw_dir}/$i -q -r; done
 	sleep 2
     pause_for_review
 }
@@ -71,7 +71,7 @@ install_master_node_cpld_firmware() {
 	fi
 
 	# Update CPLD firmware
-	for i in `ls ${fw_dir}|grep BIN|grep CPLD`; do sh ${fw_dir}/$i -q; done
+	for i in `ls ${fw_dir}|grep BIN|grep CPLD`; do ${fw_dir}/$i -q; done
 
 	# Reboot for the update to take effect
 	racadm set BIOS.MiscSettings.PowerCycleRequest FullPowerCycle
