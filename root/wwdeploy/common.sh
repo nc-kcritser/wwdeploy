@@ -10,10 +10,10 @@ else
     echo "Warning: /root/openhpc-set-vars.sh not found."
 fi
 
-if [ -f /root/warewulf-download-vars.sh ]; then
-    source /root/warewulf-download-vars.sh
+if [ -f /root/wwdeploy/reference_external_downloads.config ]; then
+    source /root/wwdeploy/reference_external_downloads.config
 else
-    echo "Warning: /root/warewulf-download-vars.sh not found."
+    echo "Warning: /root/wwdeploy/reference_external_downloads.config not found."
 fi
 
 
