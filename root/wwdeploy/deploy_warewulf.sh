@@ -88,7 +88,7 @@ show_main_menu() {
             1) ./master-node-config.sh ;;
             2) ./network-config.sh ;;
             3) ./firmware-updates.sh ;;
-            4) ./warewulf-config.sh ;;
+            4) ./warewulf-setup.sh ;;
             5) ./ww4-image-management.sh ;;
             6) ./hpc-shared-software-installs.sh ;;
             7) ./monitoring-security.sh ;;

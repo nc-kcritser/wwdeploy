@@ -4,16 +4,16 @@
 
 # Source OpenHPC and Warewulf variables so they are available to all scripts.
 # Note: The paths to these files must be correct relative to the execution directory.
-if [ -f /root/openhpc-set-vars.sh ]; then
-    source /root/openhpc-set-vars.sh
+if [ -f /root/wwdeploy/customer-set-vars.sh ]; then
+    source /root/wwdeploy/customer-set-vars.sh
 else
-    echo "Warning: /root/openhpc-set-vars.sh not found."
+    echo "Warning: /root/wwdeploy/customer-set-vars.sh not found."
 fi
 
-if [ -f /root/warewulf-download-vars.sh ]; then
-    source /root/warewulf-download-vars.sh
+if [ -f /root/wwdeploy/reference_external_downloads.config ]; then
+    source /root/wwdeploy/reference_external_downloads.config
 else
-    echo "Warning: /root/warewulf-download-vars.sh not found."
+    echo "Warning: /root/wwdeploy/reference_external_downloads.config not found."
 fi
 
 
