@@ -510,7 +510,7 @@ show_master_node_menu() {
 		echo -e "  ${YELLOW}3)${BLUE} Install prerequisite RPM packages ${RESET}"
         echo -e "  ${YELLOW}4)${BLUE} Configure local OS repo from ISO ${RESET}"
         echo -e "  ${YELLOW}5)${BLUE} Install Dell iDRAC Tools ${RESET}"
-        echo -e "  ${YELLOW}6)${BLUE} Install Fabrics (DOCA, MLNXOFED, OPA) ${RESET}"
+        echo -e "  ${YELLOW}6)${BOLDRED} Install Fabrics (DOCA, MLNX-OFED, OPA) Menu ---> ${RESET}"
         echo -e "  ${YELLOW}7)${BLUE} Create Local Users and Groups ${RESET}"
         echo -e "  ${YELLOW}8)${BLUE} Configure DNS / name servers ${RESET}"
         echo -e "  ${YELLOW}9)${BLUE} Configure time zone and time server ${RESET}"
@@ -521,18 +521,11 @@ show_master_node_menu() {
         case $mn_choice in
 		    0) show_security_menu ;;
 			1) configure_master_hostname ;;
-            2)
-                if [ -f ./network-config.sh ]; then
-                    ./network-config.sh
-                else
-                    console_fail_msg "network-config.sh not found in the current directory."
-                    pause_for_review
-                fi
-                ;;            
+            2) "${SCRIPT_DIR}/modules/02_network-config.sh" ;;            
             3) install_ohpc_ww_prereqs ;;
             4) build_local_os_repo ;;
             5) install_idractools_master ;;
-            6) "${SCRIPT_DIR}/../modules/10_fabric-software-install.sh" ;;
+            6) "${SCRIPT_DIR}/modules/10_fabric-software-install.sh" ;;
             7) create_local_users_groups ;;
             8) configure_master_host_dns ;;
             9) configure_master_timezone_chrony ;;

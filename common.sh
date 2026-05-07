@@ -4,6 +4,12 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# DEPLOY_ROOT can be set by the caller; if not set, derive it from this script's location
+if [ -z "$DEPLOY_ROOT" ]; then
+    DEPLOY_ROOT="$SCRIPT_DIR"
+fi
+export DEPLOY_ROOT
+
 if [ -f "${SCRIPT_DIR}/site-config.sh" ]; then
     source "${SCRIPT_DIR}/site-config.sh"
 else

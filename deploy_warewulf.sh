@@ -4,6 +4,10 @@
 # Assumes all scripts are located in /root/ww-deploy/
 #
 
+# Set DEPLOY_ROOT before sourcing common.sh to ensure consistent path resolution
+DEPLOY_ROOT="$(cd "$(dirname "$0")" && pwd)"
+export DEPLOY_ROOT
+
 # This script depends on 'common.sh' to be in the same directory.
 # If common.sh is not found, the script will exit.
 if [ -f ./common.sh ]; then
