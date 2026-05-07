@@ -95,7 +95,8 @@ show_main_menu() {
         echo -e "  ${YELLOW}7)${BLUE} Monitoring & Security Menu ${RESET}"
         echo -e "  ${YELLOW}8)${BLUE} Troubleshooting Menu ${RESET}"
         echo -e "  ${YELLOW}9)${BLUE} Post-Deployment Cleanup ${RESET}"
-        echo -e " ${YELLOW}10)${BLUE} Exit ${RESET}"
+        echo -e " ${YELLOW}10)${BLUE} Fabric Software Installation Menu ${RESET}"
+        echo -e " ${YELLOW}11)${BLUE} Exit ${RESET}"
         echo -e "${BLUE}************************************************${RESET}"
         read -p "Enter your choice: " main_choice
 
@@ -109,7 +110,8 @@ show_main_menu() {
             7) "${SCRIPT_DIR}/modules/07_monitoring-security.sh" ;;
             8) "${SCRIPT_DIR}/modules/08_troubleshooting.sh" ;;
             9) post_deployment_cleanup ;;
-            10) exit 0 ;;
+            10) "${SCRIPT_DIR}/modules/10_fabric-software-install.sh" ;;
+            11) exit 0 ;;
             *)
                 echo "Invalid option. Please try again."
                 sleep 2

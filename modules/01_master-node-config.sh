@@ -239,179 +239,7 @@ install_idractools_master() {
 # 	pause_for_review
 # }
 
-install_mellanox_ofed_master() {
-    option_picked "Install Mellanox OFED"
-
-    # Get the OS minor version (e.g., 4 from 9.4)
-    local os_version_minor
-    os_version_minor=$(echo "$os_version_full" | cut -d'.' -f2)
-
-    # --- Build the dynamic menu for OFED versions ---
-    local PS3="Please choose an OFED version to install: "
-    local options=()
-
-    if (( os_version_minor <= 4 )); then
-        options+=("OFED 23.10 (for RHEL/Rocky <= 9.4)")
-    fi
-    if (( os_version_minor >= 5 )); then
-        options+=("OFED 24.10 (for RHEL/Rocky 9.5+)")
-    fi
-    options+=("Quit")
-
-    # --- Get user's choice ---
-    local DOWNLOAD_URL=""
-    local FILENAME=""
-    select choice in "${options[@]}"; do
-        case $choice in
-            "OFED 23.10"*)
-                DOWNLOAD_URL="$MLNX_OFED_2310_DL_URL"
-                FILENAME="MLNX_OFED_LINUX-23.10*.tgz"
-                break
-                ;;
-            "OFED 24.10"*)
-                DOWNLOAD_URL="$MLNX_OFED_2410_DL_URL"
-                FILENAME="MLNX_OFED_LINUX-24.10*.tgz"
-                break
-                ;;
-            "Quit")
-                console_info_msg "Aborting installation."
-                return 0
-                ;;
-            *)
-                console_fail_msg "Invalid option. Please try again."
-                ;;
-        esac
-    done
-
-    # --- Download and Install Selected OFED Version ---
-    console_taskstart_msg "Attempting to download file - $DOWNLOAD_URL"
-    if ! wget -nc -P /root "$DOWNLOAD_URL"; then
-        console_fail_msg "Download failed. Check URL and network."
-        pause_for_review
-        return 1
-    fi
-
-    local found_file
-    found_file=$(find /root/ -maxdepth 1 -name "$FILENAME" -print -quit)
-    if [ -z "${found_file}" ]; then
-        console_fail_msg "Tarball matching '$FILENAME' not found in /root."
-        pause_for_review
-        return 1
-    fi
-
-    console_info_msg "Installing OFED from Tarball: ${found_file}..."
-	
-	# Extract the tarball to /tmp
-    tar zxf "${found_file}" -C /tmp
-
-	local dir_count
-	dir_count=$(find /tmp -maxdepth 1 -type d -name 'MLNX_OFED_LINUX*' | wc -l)
-
-	if [ "$dir_count" -ne 1 ]; then
-		console_fail_msg "Found $dir_count directories matching 'MLNX_OFED_LINUX*' in /tmp."
-		console_info_msg "Please clean up /tmp so there is only 0 or 1 OFED directories and run this again."
-		console_info_msg "---> There's probably a leftover log directory from a previous install. Clean that up first."
-		pause_for_review
-		# Exit the function if there are multiple directories
-		return 2
-	else
-		# This command is now safe because we know the wildcard will only match one directory
-		console_info_msg "Found one OFED directory, changing directory..."
-		cd /tmp/MLNX_OFED_LINUX* || return 1
-	fi
-    ./mlnxofedinstall --skip-distro-check --without-32bit --without-fw-update --kmp --enable-opensm -q
-	pause_for_review
-
-	# Prompt the user to see if they want to enable OpenSM service
-	console_info_msg "Do you want to enable the OpenSM service? (y/n)"
-	read -r enable_opensm
-	if [[ "$enable_opensm" =~ ^[Yy]$ ]]; then
-		console_info_msg "Enabling OpenSM service..."
-		systemctl enable --now opensmd
-		if systemctl is-active --quiet opensmd; then
-			console_taskcomplete_msg "OpenSM service is now enabled and running."
-		else
-			console_fail_msg "Failed to enable OpenSM service. Please check the service status."
-			pause_for_review
-			return 1
-		fi
-	else
-		console_info_msg "OpenSM service will not be enabled. You can enable it later with 'systemctl enable --now opensmd'."
-	fi
-
-	# Clean up the installation files
-    cd /tmp || return 1
-    rm -rf MLNX_OFED_LINUX* ofed.conf.save ofed.conf
-
-    console_taskcomplete_msg "Mellanox OFED installation complete."
-    pause_for_review
-}
-
-install_nvidia_doca_ofed_master() {
-    option_picked "Install NVIDIA DOCA Host"
-
-    # --- Download Step ---
-    console_info_msg "Attempting to download DOCA Host RPM..."
-	echo "Downloading DOCA Host RPM from: $MLNX_DOCA_OFED_3_DL_URL"
-    if ! wget -nc "$MLNX_DOCA_OFED_3_DL_URL"; then
-        console_fail_msg "Download failed. Check URL and network."
-        pause_for_review
-        return 1
-    fi
-
-    # --- Find Downloaded RPM ---
-    local FILENAME="doca-host-3.0.0*.rpm"
-    local found_file
-    found_file=$(find /root/ -maxdepth 1 -name "$FILENAME" -print -quit)
-    if [ -z "${found_file}" ]; then
-        console_fail_msg "RPM matching '$FILENAME' not found in /root."
-        pause_for_review
-        return 1
-    fi
-
-    # --- Install RPM using DNF ---
-    console_info_msg "Installing DOCA from RPM: ${found_file}..."
-    if ! dnf localinstall -y "${found_file}"; then
-        console_fail_msg "DNF command failed to install DOCA RPM. See errors above."
-        pause_for_review
-        return 1
-    fi
-
-    console_taskcomplete_msg "NVIDIA DOCA Host installation complete."
-    pause_for_review
-}
-
-
-install_cornelis_omnipath_masternode () {
-    option_picked "Install Cornelis Networks Omni-Path"
-	mkdir -p /opt/ohpc/pub/apps/cornelis/{RPM,firmware}
-	cornelis_file=$(find /root -maxdepth 1 -name 'CornelisOPX*.tgz' -print -quit)
-	if [ -z "${cornelis_file}" ];then
-		console_fail_msg "Cornelis Networks Omni-Path tarball not found in /root. Please download the file and run this again."
-		pause_for_review
-		return 1
-	fi
-
-	# Install prerequisite RPMs
-	dnf install -y kernel-abi-stablelists atlas
-
-    cd /tmp || return 1
-	tar zxf "${cornelis_file}"
-    cornelis_working_dir=$(basename "${cornelis_file}" .tgz)
-	cd "${cornelis_working_dir}" || return 1
-    # Move firmware RPMs before install, if they exist
-    mv hfi1*.rpm /opt/ohpc/pub/apps/cornelis/RPM/ 2>/dev/null
-	./INSTALL -a
-	cd /tmp || return 1
-	rm -rf "${cornelis_working_dir}"
-
-	# Install firmware RPMs if any were found
-    if ls /opt/ohpc/pub/apps/cornelis/RPM/*.rpm 1> /dev/null 2>&1; then
-	    dnf localinstall -y /opt/ohpc/pub/apps/cornelis/RPM/*.rpm
-    fi
-    console_taskcomplete_msg "Cornelis Omni-Path installation complete."
-	pause_for_review
-}
+# Fabric software installation functions moved to 10_fabric-software-install.sh module
 
 manage_security() {
     local action=$1
@@ -511,24 +339,87 @@ configure_master_host_dns() {
 		echo "nameserver ${dns_server3}" >> /etc/resolv.conf
 	fi
     console_taskcomplete_msg "/etc/resolv.conf has been updated."
+	echo -e "\n${BLUE}Current /etc/resolv.conf:${RESET}"
+	cat /etc/resolv.conf
     pause_for_review
 }
 
 configure_master_timezone_chrony() {
 	option_picked "Configure Timezone and Time Server"
 	console_info_msg "Configuring the timezone..."
-	PS3='Choose time zone: '
-	options=("Eastern" "Central" "Mountain" "Phoenix" "Pacific" "Alaska" "Honolulu" "Skip")
-	select opt in "${options[@]}"; do
-		case $opt in
-			"Eastern") timedatectl set-timezone America/New_York; break ;;
-			"Central") timedatectl set-timezone America/Chicago; break ;;
-			"Mountain") timedatectl set-timezone America/Denver; break ;;
-			"Phoenix") timedatectl set-timezone America/Phoenix; break ;;
-			"Pacific") timedatectl set-timezone America/Los_Angeles; break ;;
-			"Alaska") timedatectl set-timezone America/Anchorage; break ;;
-			"Honolulu") timedatectl set-timezone Pacific/Honolulu; break ;;
-            "Skip") break;;
+
+	local tz_set=false
+	while [ "$tz_set" = false ]; do
+		echo -e "\n${BLUE}Timezone Selection${RESET}"
+		echo " 0) UTC"
+		echo " 1) Eastern"
+		echo " 2) Central"
+		echo " 3) Mountain"
+		echo " 4) Phoenix"
+		echo " 5) Pacific"
+		echo " 6) Alaska"
+		echo " 7) Honolulu"
+		echo " 8) Specify custom timezone"
+		echo " 9) Skip timezone configuration"
+		read -p "=> " tz_choice
+
+		case $tz_choice in
+			0)
+				timedatectl set-timezone UTC
+				console_taskcomplete_msg "Timezone set to UTC."
+				tz_set=true
+				;;
+			1)
+				timedatectl set-timezone America/New_York
+				console_taskcomplete_msg "Timezone set to Eastern."
+				tz_set=true
+				;;
+			2)
+				timedatectl set-timezone America/Chicago
+				console_taskcomplete_msg "Timezone set to Central."
+				tz_set=true
+				;;
+			3)
+				timedatectl set-timezone America/Denver
+				console_taskcomplete_msg "Timezone set to Mountain."
+				tz_set=true
+				;;
+			4)
+				timedatectl set-timezone America/Phoenix
+				console_taskcomplete_msg "Timezone set to Phoenix."
+				tz_set=true
+				;;
+			5)
+				timedatectl set-timezone America/Los_Angeles
+				console_taskcomplete_msg "Timezone set to Pacific."
+				tz_set=true
+				;;
+			6)
+				timedatectl set-timezone America/Anchorage
+				console_taskcomplete_msg "Timezone set to Alaska."
+				tz_set=true
+				;;
+			7)
+				timedatectl set-timezone Pacific/Honolulu
+				console_taskcomplete_msg "Timezone set to Honolulu."
+				tz_set=true
+				;;
+			8)
+				read -p "Enter timezone (e.g., Europe/Paris, Asia/Tokyo, Australia/Sydney): " custom_tz
+				if timedatectl set-timezone "$custom_tz" 2>/dev/null; then
+					console_taskcomplete_msg "Timezone set to $custom_tz."
+					tz_set=true
+				else
+					console_fail_msg "Invalid timezone: $custom_tz (check /usr/share/zoneinfo for valid names)."
+				fi
+				;;
+			9)
+				console_info_msg "Skipping timezone configuration."
+				tz_set=true
+				;;
+			*)
+				echo "Invalid option. Please try again."
+				;;
 		esac
 	done
 	console_taskcomplete_msg "Timezone is now: $(timedatectl | grep "Time zone" | awk -F ': ' '{print $2}')"
@@ -549,30 +440,60 @@ configure_master_timezone_chrony() {
     else
         console_info_msg "Skipping NTP server configuration."
     fi
+    sleep 5     # waiting for chrony to catchup.
+	echo -e "\n${BLUE}Current Chrony NTP Sources:${RESET}"
+	chronyc sources
 	pause_for_review
 }
 
-create_users_groups() {
-    option_picked "Create Users/Groups"
+create_local_users_groups() {
+    option_picked "Create Local Users/Groups"
 	if ! getent group dell >/dev/null; then groupadd -g 4999 dell; fi
 
-	PS3='Select user type to create: '
-	options=("hpl" "gpu" "custom" "Quit")
-	select opt in "${options[@]}"; do
-		case $opt in
-			"hpl") useradd hpl -u 4999 -g dell -c "High Performance Linpack" -m ;;
-			"gpu") useradd gpu -u 4998 -g dell -c "Nvidia CUDA HPL" -m ;;
-			"custom")
+	while true; do
+		echo -e "\n${BLUE}User Creation Menu${RESET}"
+		echo " 1) Create HPL user"
+		echo " 2) Create GPU user"
+		echo " 3) Create custom user"
+		echo " 0) Finished - Return to main menu"
+		read -p "=> " user_choice
+
+		case $user_choice in
+			1)
+				if useradd hpl -u 4999 -g dell -c "High Performance Linpack" -m 2>/dev/null; then
+					console_taskcomplete_msg "HPL user created successfully."
+				else
+					console_fail_msg "Failed to create HPL user (may already exist)."
+				fi
+				;;
+			2)
+				if useradd gpu -u 4998 -g dell -c "Nvidia CUDA HPL" -m 2>/dev/null; then
+					console_taskcomplete_msg "GPU user created successfully."
+				else
+					console_fail_msg "Failed to create GPU user (may already exist)."
+				fi
+				;;
+			3)
 				read -p "Enter username: " user_name
 				read -p "Enter display name: " display_name
 				read -p "Enter user ID: " user_id
-				useradd "${user_name}" -u "${user_id}" -g dell -c "${display_name}" -m
-				passwd "${user_name}"
+				if useradd "${user_name}" -u "${user_id}" -g dell -c "${display_name}" -m 2>/dev/null; then
+					console_taskcomplete_msg "User '${user_name}' created. Setting password now..."
+					passwd "${user_name}"
+					console_taskcomplete_msg "Password set for '${user_name}'."
+				else
+					console_fail_msg "Failed to create user '${user_name}' (may already exist)."
+				fi
 				;;
-			"Quit") break ;;
+			0)
+				break
+				;;
+			*)
+				echo "Invalid option. Please try again."
+				;;
 		esac
 	done
-    console_taskcomplete_msg "User creation process finished."
+    console_taskcomplete_msg "Exiting User creation function... returning to menu. "
     pause_for_review
 }
 
@@ -589,13 +510,11 @@ show_master_node_menu() {
 		echo -e "  ${YELLOW}3)${BLUE} Install prerequisite RPM packages ${RESET}"
         echo -e "  ${YELLOW}4)${BLUE} Configure local OS repo from ISO ${RESET}"
         echo -e "  ${YELLOW}5)${BLUE} Install Dell iDRAC Tools ${RESET}"
-        echo -e "  ${YELLOW}6)${BLUE} Install Mellanox OFED ${RESET}"
-		echo -e "  ${YELLOW}7)${BLUE} Install NVIDIA DOCA-OFED ${BOLDRED}(Not Yet Implemented) ${RESET}"
-        echo -e "  ${YELLOW}8)${BLUE} Install Cornelis Omni-Path ${RESET}"
-        echo -e "  ${YELLOW}9)${BLUE} Create Users and Groups ${RESET}"
-        echo -e " ${YELLOW}10)${BLUE} Configure DNS / name servers ${RESET}"
-        echo -e " ${YELLOW}11)${BLUE} Configure time zone and time server ${RESET}"
-        echo -e " ${YELLOW}12)${BLUE} Return to Main Menu ${RESET}"
+        echo -e "  ${YELLOW}6)${BLUE} Install Fabrics (DOCA, MLNXOFED, OPA) ${RESET}"
+        echo -e "  ${YELLOW}7)${BLUE} Create Local Users and Groups ${RESET}"
+        echo -e "  ${YELLOW}8)${BLUE} Configure DNS / name servers ${RESET}"
+        echo -e "  ${YELLOW}9)${BLUE} Configure time zone and time server ${RESET}"
+        echo -e " ${YELLOW}10)${BLUE} Return to Main Menu ${RESET}"
         echo -e "${BLUE}************************************************${RESET}"
         read -p "Enter your choice: " mn_choice
 
@@ -613,13 +532,11 @@ show_master_node_menu() {
             3) install_ohpc_ww_prereqs ;;
             4) build_local_os_repo ;;
             5) install_idractools_master ;;
-            6) install_mellanox_ofed_master ;;
-			7) install_nvidia_doca_ofed_master ;;
-            8) install_cornelis_omnipath_masternode ;;
-            9) create_users_groups ;;
-            10) configure_master_host_dns ;;
-            11) configure_master_timezone_chrony ;;
-            12) exit 0 ;;
+            6) "${SCRIPT_DIR}/../modules/10_fabric-software-install.sh" ;;
+            7) create_local_users_groups ;;
+            8) configure_master_host_dns ;;
+            9) configure_master_timezone_chrony ;;
+            10) exit 0 ;;
             *)
                 echo "Invalid option. Please try again."
                 sleep 2
