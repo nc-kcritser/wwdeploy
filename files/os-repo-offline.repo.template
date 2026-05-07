@@ -1,0 +1,16 @@
+[BaseOS-LocalRepo]
+name=BaseOS Packages $os_distro $os_version_full Linux - Offline (Local)
+metadata_expire=-1
+gpgcheck=0
+enabled=1
+baseurl=file:///opt/ohpc/pub/repo/$os_id$os_version_full/BaseOS/
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+
+[AppStream-LocalRepo]
+name=AppStream Packages $os_distro $os_version_full Offline (Local)
+metadata_expire=-1
+gpgcheck=0
+enabled=1
+baseurl=file:///opt/ohpc/pub/repo/$os_id$os_version_full/AppStream/
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+EOF
