@@ -96,8 +96,8 @@ create_new_container_from_local_repo() {
     fi
     mkdir -p "$CHROOT"
 
-    # Define base packages
-    local base_packages="basesystem bash coreutils e2fsprogs xfsprogs parted gdisk bind-utils ethtool filesystem findutils gawk grep initscripts iproute iputils net-tools mtr nfs-utils pam psmisc rsync pdsh bc sed setup shadow-utils rsyslog chrony tzdata ntpstat words zlib tar less gzip which util-linux openssh-clients openssh-server dhclient pciutils vim-minimal strace cronie crontabs cpio wget ipmitool yum NetworkManager kernel kernel-devel perl libnl3 tcl tk lsof gcc-gfortran numactl-libs hwloc hwloc-libs lshw hostname dmidecode"
+    # Define base packages with OS-specific additions
+    local base_packages="basesystem ${BASE_PACKAGES_CONTAINER}"
 
     # Add OS-specific packages
     case "$os_id-$os_version_major" in
@@ -223,17 +223,15 @@ download_container_image() {
         return 1
     fi
 
-    if wwctl container list | grep -q "^${container_name}\s"; then
+    if wwctl image list | grep -q "^${container_name}\s"; then
         console_fail_msg "A container named '${container_name}' already exists."
         pause_for_review
         return 1
     fi
 
     console_taskstart_msg "Importing ${image_uri} as '${container_name}'..."
-    if wwctl container import "${image_uri}" "${container_name}"; then
+    if wwctl image import "${image_uri}" "${container_name}"; then
         console_taskcomplete_msg "Container '${container_name}' imported successfully."
-        # Set the root password after importing
-        set_container_root_password "${container_name}"
         console_info_msg "You may want to build the container now to make it bootable."
     else
         console_fail_msg "Failed to import container. Check the image name and your network connection."
@@ -261,6 +259,26 @@ build_container() {
 }
 
 # --- Modify Image Functions ---
+
+install_container_base_packages() {
+    local container_name=$1
+
+    option_picked "Install Base Packages in ${container_name}"
+
+    console_taskstart_msg "Enabling EPEL repository in container..."
+    wwctl image exec "${container_name}" --build=false -- /usr/bin/dnf -y install ${EPEL_URL}  || true
+
+    console_taskstart_msg "Installing base packages..."
+    wwctl image exec "${container_name}" --build=false -- /usr/bin/dnf -y install ${BASE_PACKAGES_CONTAINER}
+    if [ $? -eq 0 ]; then
+        console_taskcomplete_msg "Base packages installed in ${container_name}."
+        console_info_msg "Container is ready for modifications. You can now add OFED, GPU drivers, etc."
+    else
+        console_fail_msg "Failed to install base packages in ${container_name}."
+    fi
+
+    pause_for_review
+}
 
 modify_container_add_mofed() {
     local container_name=$1
@@ -330,13 +348,6 @@ modify_container_add_dell_utils() {
     pause_for_review
 }
 
-modify_container_add_nvidia_runfile() {
-    local container_name=$1
-    console_info_msg "Adding NVIDIA drivers from .run file to ${container_name}..."
-    console_fail_msg "Function not yet implemented."
-    pause_for_review
-}
-
 modify_container_add_nvidia_repo() {
     local container_name=$1
     console_info_msg "Adding NVIDIA drivers from repo to ${container_name}..."
@@ -350,7 +361,6 @@ show_nvidia_submenu() {
     while [ "$exit_submenu" = false ]; do
         clear
         option_picked "Add NVIDIA GPU Drivers to ${container_name}"
-        echo "1) Install from local .run file"
         echo "2) Install from NVIDIA online repository"
         echo "3) Return to previous menu"
         read -p "Enter your choice: " choice
@@ -367,7 +377,7 @@ show_modify_image_menu() {
     option_picked "Modify Existing Container Image"
     
     # Let user select a container
-    mapfile -t containers < <(wwctl container list | awk 'NR>1 {print $1}')
+    mapfile -t containers < <(wwctl container list | awk 'NR>1 && !/^-/ {print $1}')
     if [ ${#containers[@]} -eq 0 ]; then
         console_fail_msg "No containers found to modify."
         pause_for_review
@@ -385,26 +395,26 @@ show_modify_image_menu() {
         fi
     done
 
-    local exit_submenu=false
-    while [ "$exit_submenu" = false ]; do
-        clear
-        option_picked "Modifying Container: ${container_name}"
-        echo "1) Set Root Password"
-        echo "2) Add Mellanox OFED Drivers"
-        echo "3) Add Cornelis OFED Drivers"
-        echo "4) Add Ganglia Monitoring"
-        echo "5) Add Dell Utilities (OMSA/iDRAC)"
-        echo "6) Add NVIDIA GPU Drivers (Sub-Menu)"
-        echo "7) Return to Image Menu"
+    while true; do
+        echo_menu_header "Modifying Container: ${container_name}"
+        echo -e "  ${YELLOW}1)${BLUE} Install Base Packages ${RESET}"
+        echo -e "  ${YELLOW}2)${BLUE} Set Root Password ${RESET}"
+        echo -e "  ${YELLOW}3)${BLUE} Add Mellanox OFED Drivers ${RESET}"
+        echo -e "  ${YELLOW}4)${BLUE} Add Cornelis OFED Drivers ${RESET}"
+        echo -e "  ${YELLOW}5)${BLUE} Add Ganglia Monitoring ${RESET}"
+        echo -e "  ${YELLOW}6)${BLUE} Add Dell Utilities (OMSA/iDRAC) ${RESET}"
+        echo -e "  ${YELLOW}7)${BLUE} Add NVIDIA GPU Drivers (Sub-Menu) ${RESET}"
+        echo -e "  ${YELLOW}0)${BLUE} Return to Image Menu ${RESET}"
         read -p "Enter your choice: " choice
         case $choice in
-            1) set_container_root_password "${container_name}" ;;
-            2) modify_container_add_mofed "${container_name}" ;;
-            3) modify_container_add_cornelis "${container_name}" ;;
-            4) modify_container_add_ganglia "${container_name}" ;;
-            5) modify_container_add_dell_utils "${container_name}" ;;
-            6) show_nvidia_submenu "${container_name}" ;;
-            7) exit_submenu=true ;;
+            1) install_container_base_packages "${container_name}" ;;
+            2) set_container_root_password "${container_name}" ;;
+            3) modify_container_add_mofed "${container_name}" ;;
+            4) modify_container_add_cornelis "${container_name}" ;;
+            5) modify_container_add_ganglia "${container_name}" ;;
+            6) modify_container_add_dell_utils "${container_name}" ;;
+            7) show_nvidia_submenu "${container_name}" ;;
+            0) break ;;
             *) echo "Invalid option." ; sleep 2 ;;
         esac
     done
@@ -417,7 +427,7 @@ show_image_menu() {
     while [ "$exit_menu" = false ]; do
         clear
         echo -e "${BLUE}************************************************${RESET}"
-        echo -e "${BOLDRED}** Warewulf Image Management Menu        **${RESET}"
+        echo -e "${BOLDRED}** Warewulf Image Management Menu              **${RESET}"
         echo -e "${BLUE}************************************************${RESET}"
         echo -e "  ${YELLOW}1)${BLUE} Create New OS Container (from local repo) ${RESET}"
         echo -e "  ${YELLOW}2)${BLUE} Download Container from Registry (Internet Access Required) ${RESET}"

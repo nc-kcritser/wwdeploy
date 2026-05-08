@@ -148,7 +148,9 @@ interface_config_masterhost_infiniband() {
 }
 
 configure_caching_nameserver() {
-    option_picked "Configure Caching Nameserver"
+    ## FLAG: Is this still needed?
+
+	option_picked "Configure Caching Nameserver"
     # Configure caching nameserver
 	echo "Installing Bind and configuring caching nameserver"
 	sleep 2
@@ -176,9 +178,9 @@ configure_caching_nameserver() {
 show_network_menu() {
     while true; do
         clear
-        echo -e "${BLUE}************************************************${RESET}"
-        echo -e "${BLUE}** Network Configuration Menu         **${RESET}"
-        echo -e "${BLUE}************************************************${RESET}"
+        echo -e "${BLUE}**********************************************************${RESET}"
+        echo -e "${BLUE}** Network Configuration Menu - HEAD NODE OPERATIONS    **${RESET}"
+        echo -e "${BLUE}**********************************************************${RESET}"
         echo -e "  ${YELLOW}1)${BLUE} Configure provisioning ethernet interface ${RESET}"
         echo -e "  ${YELLOW}2)${BLUE} Configure alias interface for IPMI/MGMT ${RESET}"
         echo -e "  ${YELLOW}3)${BLUE} Configure external ethernet interface ${RESET}"
