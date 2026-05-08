@@ -339,19 +339,8 @@ install_container_base_packages() {
     pause_for_review
 }
 
-modify_container_add_mofed() {
-    local container_name=$1
-    console_info_msg "Adding Mellanox OFED to ${container_name}..."
-    console_fail_msg "Function not yet implemented."
-    pause_for_review
-}
 
-modify_container_add_cornelis() {
-    local container_name=$1
-    console_info_msg "Adding Cornelis OFED to ${container_name}..."
-    console_fail_msg "Function not yet implemented."
-    pause_for_review
-}
+
 
 modify_container_add_ganglia() {
     local container_name=$1
@@ -455,66 +444,69 @@ show_modify_image_menu() {
     done
 
     while true; do
-        echo_menu_header "Modifying Container: ${container_name}"
-        echo -e "  ${YELLOW}1)${BLUE} Install Base Packages ${RESET}"
-        echo -e "  ${YELLOW}2)${BLUE} Set Root Password ${RESET}"
-        echo -e "  ${YELLOW}3)${BLUE} Add Mellanox OFED Drivers ${RESET}"
-        echo -e "  ${YELLOW}4)${BLUE} Add Cornelis OFED Drivers ${RESET}"
-        echo -e "  ${YELLOW}5)${BLUE} Add Ganglia Monitoring ${RESET}"
-        echo -e "  ${YELLOW}6)${BLUE} Add Dell Utilities (OMSA/iDRAC) ${RESET}"
-        echo -e "  ${YELLOW}7)${BLUE} Add NVIDIA GPU Drivers (Sub-Menu) ${RESET}"
-        echo -e "  ${YELLOW}0)${BLUE} Return to Image Menu ${RESET}"
-        read -p "Enter your choice: " choice
+        echo_menu_header "Modify Container Image: ${container_name}"
+        echo_section_header "CONTAINER PACKAGES & CONFIG"
+        echo " 1) Install Base Packages"
+        echo " 2) Set Root Password"
+        echo " 3) Add Ganglia Monitoring"
+        echo " 4) Add Dell Utilities (OMSA/iDRAC)"
+        echo " 5) Add NVIDIA GPU Drivers"
+        echo " 6) Add AMD GPU Drivers (NOT YET IMPLEMENTED)"
+        echo " 7) Add Prometheus Node Exporter for Monitoring"
+        echo " "
+        echo_section_header "FOR FABRIC SOFTWARE (DOCA/OFED/OMNI-PATH)"
+        echo " See Fabric Software Module (Headnode/Image Injection)"
+        echo " "
+        echo " 0) Return to image management menu"
+        read -r -p "=> " choice
         case $choice in
-            1) install_container_base_packages "${container_name}" ;;
-            2) set_container_root_password "${container_name}" ;;
-            3) modify_container_add_mofed "${container_name}" ;;
-            4) modify_container_add_cornelis "${container_name}" ;;
-            5) modify_container_add_ganglia "${container_name}" ;;
-            6) modify_container_add_dell_utils "${container_name}" ;;
-            7) show_nvidia_submenu "${container_name}" ;;
+            1) option_picked "Install Base Packages"; install_container_base_packages "${container_name}" ;;
+            2) option_picked "Set Root Password"; set_container_root_password "${container_name}" ;;
+            3) option_picked "Add Ganglia Monitoring"; modify_container_add_ganglia "${container_name}" ;;
+            4) option_picked "Add Dell Utilities"; modify_container_add_dell_utils "${container_name}" ;;
+            5) option_picked "Add NVIDIA GPU Drivers"; show_nvidia_submenu "${container_name}" ;;
+            6) option_picked "Add AMD GPU Drivers"; show_amd_submenu "${container_name}" ;;
+            7) option_picked "Add Prometheus Node Exporter"; modify_container_add_nodeexporter "${container_name}" ;;
             0) break ;;
-            *) echo "Invalid option." ; sleep 2 ;;
+            *) echo "Invalid option" ;;
         esac
     done
 }
 
 
-# --- Main Menu for this script ---
-show_image_menu() {
-    local exit_menu=false
-    while [ "$exit_menu" = false ]; do
-        clear
-        echo -e "${BLUE}************************************************${RESET}"
-        echo -e "${BOLDRED}** Warewulf Image Management Menu              **${RESET}"
-        echo -e "${BLUE}************************************************${RESET}"
-        echo -e "  ${YELLOW}1)${BLUE} Create New OS Container (from local repo) ${RESET}"
-        echo -e "  ${YELLOW}2)${BLUE} Download Container from Registry (Internet Access Required) ${RESET}"
-        echo -e "${BLUE}------------------------------------------------${RESET}"
-        echo -e "  ${YELLOW}3)${BLUE} Build Container ${RESET}"
-        echo -e "  ${YELLOW}4)${BLUE} Maintain Container (modify/manage) ${RESET}"
-        echo -e "  ${YELLOW}5)${BLUE} Run Manual Post Processing / Prerequisites ${RESET}"
-        echo -e "${BLUE}------------------------------------------------${RESET}"
-        echo -e "  ${YELLOW}6)${BLUE} List Existing Containers ${RESET}"
-        echo -e "  ${YELLOW}7)${BLUE} Return to Main Menu ${RESET}"
-        echo -e "${BLUE}************************************************${RESET}"
-        read -p "Enter your choice: " choice
+image_management_menu() {
+    local option
+    while true; do
+        echo_menu_header "Container Image Management"
+        echo_section_header "CREATE/DOWNLOAD CONTAINER IMAGES"
+        echo " 1) Create New Container from Local Repository"
+        echo " 2) Download Container from Registry (Internet Required)"
+        echo ""
+        echo_section_header "MODIFY/BUILD CONTAINER IMAGES"
+        echo " 3) Modify Existing Container Image (packages, tools, etc.)"
+        echo " 4) Build Container"
+        echo " 5) Run Manual Post-Processing on Container"
+        echo ""
+        echo_section_header "MANAGE CONTAINERS"
+        echo " 6) List Existing Containers"
+        echo ""
+        echo " 0) Return to main menu"
+        read -r -p "=> " option
 
-        case $choice in
-            1) create_new_container_from_local_repo ;;
-            2) download_container_image ;;
-            3) build_container ;;
-            4) show_modify_image_menu ;;
-            5) run_manual_post_processing ;;
-            6) list_containers ;;
-            7) exit_menu=true ;;
+        case $option in
+            1) option_picked "Create New Container from Local Repo"; create_new_container_from_local_repo ;;
+            2) option_picked "Download Container from Registry"; download_container_image ;;
+            3) option_picked "Modify Container Image"; show_modify_image_menu ;;
+            4) option_picked "Build Container"; build_container ;;
+            5) option_picked "Run Manual Post-Processing"; run_manual_post_processing ;;
+            6) option_picked "List Containers"; list_containers ;;
+            0) break ;;
             *)
-                echo "Invalid option. Please try again."
-                sleep 2
+                echo "Invalid option"
                 ;;
         esac
     done
 }
 
-# --- Script execution starts here ---
-show_image_menu
+# Module runs its own menu and exits
+image_management_menu

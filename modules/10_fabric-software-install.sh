@@ -141,8 +141,169 @@ install_doca_rpm() {
     pause_for_review
 }
 
+inject_doca_into_image() {
+    # Section - Installs DOCA into Compute Node (Prompts for Version, Installs Repo, Install DOCA Edition)
+    
+
+    # --- Select container ---
+    mapfile -t containers < <(wwctl image list | awk 'NR>1 && !/^-/ {print $1}')
+    if [ ${#containers[@]} -eq 0 ]; then
+        console_fail_msg "No containers found."
+        pause_for_review
+        return
+    fi
+
+    local PS3="Select container to modify: "
+    local container_name=""
+    select container_choice in "${containers[@]}" "Cancel"; do
+        if [[ "$container_choice" == "Cancel" ]]; then
+            console_info_msg "DOCA injection cancelled."
+            pause_for_review
+            return 0
+        elif [[ -n "$container_choice" ]]; then
+            container_name="$container_choice"
+            break
+        else
+            echo "Invalid selection."
+        fi
+    done
+
+    local container_path=$(wwctl image show "${container_name}" | awk '{print $NF}')
+
+    # --- Select DOCA version ---
+    PS3="Select DOCA version: "
+    local doca_menu=("3.3" "3.2.2 (LTS)" "3.2.1 (LTS)" "3.2.0 (LTS)" "3.1.0" "3.0.0" "2.9.4 (LTS)" "Cancel")
+    local DOCA_VER=""
+
+    select choice in "${doca_menu[@]}"; do
+        case $choice in
+            "Cancel")
+                console_info_msg "DOCA injection cancelled."
+                pause_for_review
+                return 0
+                ;;
+            *)
+                DOCA_VER=$(echo "$choice" | cut -d' ' -f1)
+                break
+                ;;
+        esac
+    done
+
+    # --- Configure DOCA repository in container ---
+    console_taskstart_msg "Configuring DOCA $DOCA_VER repository in container ${container_name}..."
+    export DOCA_VER os_version_major
+    mkdir -p "${container_path}/etc/yum.repos.d"
+    envsubst < "${DEPLOY_ROOT}/files/doca.repo.template" > "${container_path}/etc/yum.repos.d/doca.repo"
+    console_taskcomplete_msg "DOCA repository configured."
+
+    # --- Select DOCA package variant ---
+    PS3="Select DOCA package to inject: "
+    local doca_pkgs=("doca-basic" "doca-ofed" "doca-networking" "doca-roce" "doca-all" "Cancel")
+    local DOCA_PKG=""
+
+    select pkg_choice in "${doca_pkgs[@]}"; do
+        case $pkg_choice in
+            "Cancel")
+                console_info_msg "DOCA injection cancelled."
+                pause_for_review
+                return 0
+                ;;
+            *)
+                DOCA_PKG="$pkg_choice"
+                break
+                ;;
+        esac
+    done
+
+    # --- Detect kernel versions in the container ---
+    echo_section_header "KERNEL VERSION DETECTION"
+
+    console_taskstart_msg "Method 1 - wwctl image kernels:"
+    wwctl image kernels "${container_name}"
+
+    console_taskstart_msg "Method 2 - /boot search in container:"
+    find "${container_path}/boot" -maxdepth 1 -name 'initramfs-*' | sed 's|.*/initramfs-||; s|\.img||'
+
+    # --- Print next-step instructions ---
+    echo ""
+    echo_section_header "NEXT STEPS - RUN INSIDE CONTAINER SHELL"
+    console_info_msg "You will be dropped into the container shell."
+    console_info_msg "Run the following commands:"
+    echo ""
+    echo -e "  ${YELLOW}dnf install -y kernel-devel-\$(rpm -q kernel --queryformat '%{VERSION}-%{RELEASE}.%{ARCH}\n' | head -1)${RESET}"
+    echo -e "  ${YELLOW}dnf install -y ${DOCA_PKG}${RESET}"
+    echo ""
+    console_info_msg "If DKMS fails, check 'uname -r' vs 'rpm -q kernel' inside the shell."
+    console_info_msg "When done: exit the shell, then run 'wwctl image build ${container_name}'"
+    echo ""
+    read -p "Press Enter to open container shell, or Ctrl+C to cancel..."
+
+    # --- Launch interactive container shell ---
+    wwctl image shell "${container_name}" --build=false
+
+    console_taskcomplete_msg "Container shell exited."
+    console_info_msg "Remember to: wwctl image build ${container_name}"
+    pause_for_review
+}
+
+inject_mellanox_ofed_into_image() {
+    option_picked "Inject Mellanox OFED into Compute Node Container Image"
+
+    console_fail_msg "Function not yet implemented."
+    pause_for_review
+}
+
+inject_cornelis_into_image() {
+    option_picked "Inject Cornelis Omni-Path into Compute Node Container Image"
+
+    # --- Select container ---
+    mapfile -t containers < <(wwctl image list | awk 'NR>1 && !/^-/ {print $1}')
+    if [ ${#containers[@]} -eq 0 ]; then
+        console_fail_msg "No containers found."
+        pause_for_review
+        return
+    fi
+
+    local PS3="Select container to modify: "
+    local container_name=""
+    select container_choice in "${containers[@]}" "Cancel"; do
+        if [[ "$container_choice" == "Cancel" ]]; then
+            console_info_msg "Omni-Path injection cancelled."
+            pause_for_review
+            return 0
+        elif [[ -n "$container_choice" ]]; then
+            container_name="$container_choice"
+            break
+        else
+            echo "Invalid selection."
+        fi
+    done
+
+    console_info_msg "NOTE: Cornelis Omni-Path installation in containers requires:"
+    console_info_msg "  - Omni-Path tarball available in /root/ (extract on headnode first)"
+    console_info_msg "  - Kernel version in container matches headnode kernel"
+    console_info_msg "  - Sufficient disk space in container"
+    read -p "Press Enter to proceed, or Ctrl+C to cancel..."
+
+    console_taskstart_msg "Installing Cornelis Omni-Path packages in container ${container_name}..."
+    if wwctl image exec "${container_name}" --build=false -- /usr/bin/dnf -y install libpsm2 libfabric; then
+        console_taskcomplete_msg "Cornelis Omni-Path base packages installed in ${container_name}."
+    else
+        console_fail_msg "Failed to install Omni-Path packages in container ${container_name}."
+        pause_for_review
+        return 1
+    fi
+
+    console_info_msg "For full Omni-Path driver installation, please:"
+    console_info_msg "  1. Extract CornelisOPX-*.tgz on headnode"
+    console_info_msg "  2. Mount the directory in container or copy files"
+    console_info_msg "  3. Run ./INSTALL inside container"
+    console_info_msg "Remember to rebuild the container for changes to take effect."
+    pause_for_review
+}
+
 install_mellanox_ofed() {
-    option_picked "Install Mellanox OFED from Local Tarball"
+    option_picked "Install Mellanox OFED on Headnode from Local Tarball"
 
     # --- Kernel Update Warning ---
     console_fail_msg "⚠️  WARNING: Kernel updates must be completed BEFORE installing Mellanox OFED."
@@ -159,6 +320,15 @@ install_mellanox_ofed() {
         pause_for_review
         return 1
     fi
+
+    # --- Install kernel headers (required for DKMS compilation) ---
+    console_taskstart_msg "Installing kernel headers and development packages..."
+    if ! dnf install -y kernel-devel kernel-headers; then
+        console_fail_msg "Failed to install kernel headers. OFED installation requires these packages."
+        pause_for_review
+        return 1
+    fi
+    console_taskcomplete_msg "Kernel headers installed."
 
     # --- Ask about OpenSM ---
     console_info_msg "Do you want to enable OpenSM support? (y/n)"
@@ -237,8 +407,14 @@ install_omnipath() {
 		return 1
 	fi
 
-	# Install prerequisite RPMs
-	dnf install -y kernel-abi-stablelists atlas
+	# Install prerequisite packages (including kernel headers for DKMS compilation)
+	console_taskstart_msg "Installing prerequisite packages..."
+	if ! dnf install -y kernel-devel kernel-headers kernel-abi-stablelists atlas; then
+		console_fail_msg "Failed to install prerequisite packages."
+		pause_for_review
+		return 1
+	fi
+	console_taskcomplete_msg "Prerequisite packages installed."
 
     cd /tmp || return 1
 	tar zxf "${cornelis_file}"
@@ -258,32 +434,36 @@ install_omnipath() {
 	pause_for_review
 }
 
-# --- Sub-Menu for this script ---
-show_fabric_software_menu() {
+fabric_software_menu() {
+    local option
     while true; do
-        clear
-        echo_menu_header "Fabric Software Installation Menu"
-        echo -e "  ${YELLOW}1)${BLUE} DOCA (Online Repository) ${RESET}"
-        echo -e "  ${YELLOW}2)${BLUE} DOCA (Downloaded RPM) ${RESET}"
-        echo -e "  ${YELLOW}3)${BLUE} Mellanox OFED (Downloaded RPM) ${RESET}"
-        echo -e "  ${YELLOW}4)${BLUE} Cornelis Omni-Path (Downloaded RPM) ${RESET}"
-        echo -e "  ${YELLOW}0)${BLUE} Return to Main Menu ${RESET}"
-        echo -e "${BLUE}*************************************************${RESET}"
-        read -p "Enter your choice: " fabric_choice
-
-        case $fabric_choice in
-            1) install_doca_online ;;
-            2) install_doca_rpm ;;
-            3) install_mellanox_ofed ;;
-            4) install_omnipath ;;
+        echo_menu_header "Fabric Software Installation"
+        echo_section_header "HEADNODE INSTALLATION"
+        echo " 1) Install DOCA from Online Repository"
+        echo " 2) Install DOCA from Downloaded RPM"
+        echo " 3) Install Mellanox OFED from Local Source/Tarball"
+        echo " 4) Install Cornelis Omni-Path from Local Source/Tarball"
+        echo ""
+        echo_section_header "COMPUTE NODE IMAGE - INJECT FABRIC"
+        echo " 5) Inject DOCA into Container Image"
+        echo " 6) Inject Mellanox OFED into Container Image"
+        echo " 7) Inject Cornelis Omni-Path into Container Image"
+        echo ""
+        echo " 0) Return to main menu"
+        read -r -p "=> " option
+        case $option in
+            1) option_picked "Install DOCA from Online Repository"; install_doca_online ;;
+            2) option_picked "Install DOCA from Downloaded RPM"; install_doca_rpm ;;
+            3) option_picked "Install Mellanox OFED on Headnode"; install_mellanox_ofed ;;
+            4) option_picked "Install Cornelis Omni-Path on Headnode"; install_omnipath ;;
+            5) option_picked "Inject DOCA into Compute Node Container Image"; inject_doca_into_image ;;
+            6) option_picked "Inject Mellanox OFED into Container Image"; inject_mellanox_ofed_into_image ;;
+            7) option_picked "Inject Cornelis Omni-Path into Container Image"; inject_cornelis_into_image ;;
             0) break ;;
-            *)
-                echo "Invalid option. Please try again."
-                sleep 2
-                ;;
+            *) echo "Invalid option" ;;
         esac
     done
 }
 
-# --- Script Execution Starts Here ---
-show_fabric_software_menu
+# Module runs its own menu and exits
+fabric_software_menu

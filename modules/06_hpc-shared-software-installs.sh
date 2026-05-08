@@ -112,44 +112,27 @@ EOF
 }
 
 
-# --- Sub-Menu for this script ---
-show_hpc_software_menu() {
+hpc_software_menu() {
+    local option
     while true; do
-        clear
-        echo -e "${BLUE}************************************************${RESET}"
-        echo -e "${BLUE}** HPC Software Installation Menu         **${RESET}"
-        echo -e "${BLUE}************************************************${RESET}"
-        echo -e "  ${YELLOW}1)${BLUE} Install OpenHPC Server Packages ${RESET}"
-        echo -e "  ${YELLOW}2)${BLUE} Go to Warewulf & Cluster Management Menu -> ${RESET}"
-        echo -e "  ${YELLOW}3)${BLUE} Install Mellanox HPC-X ${RESET}"
-        echo -e "  ${YELLOW}4)${BLUE} Install Intel oneAPI Toolkit ${RESET}"
-        echo -e "  ${YELLOW}5)${BLUE} Install Nvidia CUDA Toolkit ${RESET}"
-        echo -e "  ${YELLOW}6)${BLUE} Return to Main Menu ${RESET}"
-        echo -e "${BLUE}************************************************${RESET}"
-        read -p "Enter your choice: " hpc_choice
-
-        case $hpc_choice in
-            1) install_openhpc_packages_master ;;
-            2)
-                if [ -f ./warewulf-config.sh ]; then
-                    ./warewulf-config.sh
-                else
-                    console_fail_msg "warewulf-config.sh not found in the current directory."
-                    pause_for_review
-                fi
-                ;;
-            3) install_mellanox_hpcx ;;
-            4) install_intel_oneapi ;;
-            5) install_nvidia_cuda ;;
-            6) exit 0 ;;
-            *)
-                echo "Invalid option. Please try again."
-                sleep 2
-                ;;
+        echo_menu_header "HPC Software Installation"
+        echo " 1) Install OpenHPC Server Packages"
+        echo " 2) Install Mellanox HPC-X"
+        echo " 3) Install Intel oneAPI Toolkit"
+        echo " 4) Install Nvidia CUDA Toolkit"
+        echo " 0) Return to main menu"
+        read -r -p "=> " option
+        case $option in
+            1) option_picked "Install OpenHPC Server Packages"; install_openhpc_packages_master ;;
+            2) option_picked "Install Mellanox HPC-X"; install_mellanox_hpcx ;;
+            3) option_picked "Install Intel oneAPI Toolkit"; install_intel_oneapi ;;
+            4) option_picked "Install Nvidia CUDA Toolkit"; install_nvidia_cuda ;;
+            0) break ;;
+            *) echo "Invalid option" ;;
         esac
     done
 }
 
-# --- Script execution starts here ---
-show_hpc_software_menu
+# Module runs its own menu and exits
+hpc_software_menu
                                                                                                                                                                                                       

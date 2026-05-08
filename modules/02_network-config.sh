@@ -174,36 +174,30 @@ configure_caching_nameserver() {
 	pause_for_review
 }
 
-# --- Sub-Menu for this script ---
-show_network_menu() {
+network_config_menu() {
+    local option
     while true; do
-        clear
-        echo -e "${BLUE}**********************************************************${RESET}"
-        echo -e "${BLUE}** Network Configuration Menu - HEAD NODE OPERATIONS    **${RESET}"
-        echo -e "${BLUE}**********************************************************${RESET}"
-        echo -e "  ${YELLOW}1)${BLUE} Configure provisioning ethernet interface ${RESET}"
-        echo -e "  ${YELLOW}2)${BLUE} Configure alias interface for IPMI/MGMT ${RESET}"
-        echo -e "  ${YELLOW}3)${BLUE} Configure external ethernet interface ${RESET}"
-        echo -e "  ${YELLOW}4)${BLUE} Configure InfiniBand interface ${RESET}"
-        echo -e "  ${YELLOW}5)${BLUE} Configure Caching Nameserver ${RESET}"
-        echo -e "  ${YELLOW}6)${BLUE} Return to Main Menu ${RESET}"
-        echo -e "${BLUE}************************************************${RESET}"
-        read -p "Enter your choice: " net_choice
-
-        case $net_choice in
-            1) interface_config_masterhost_provisioning ;;
-            2) interface_config_masterhost_alias ;;
-            3) interface_config_masterhost_external ;;
-            4) interface_config_masterhost_infiniband ;;
-            5) configure_caching_nameserver ;;
-            6) exit 0 ;;
-            *)
-                echo "Invalid option. Please try again."
-                sleep 2
-                ;;
+        echo_menu_header "Network Configuration"
+        echo " 1) Configure provisioning ethernet interface"
+        echo " 2) Configure alias interface for IPMI/MGMT"
+        echo " 3) Configure external ethernet interface"
+        echo " 4) Configure InfiniBand interface"
+        echo " 5) Configure caching nameserver"
+        echo " 6) Configure firewall and security (see Security Module)"
+        echo " 0) Return to main menu"
+        read -r -p "=> " option
+        case $option in
+            1) option_picked "Configure provisioning ethernet interface"; interface_config_masterhost_provisioning ;;
+            2) option_picked "Configure alias interface for IPMI/MGMT"; interface_config_masterhost_alias ;;
+            3) option_picked "Configure external ethernet interface"; interface_config_masterhost_external ;;
+            4) option_picked "Configure InfiniBand interface"; interface_config_masterhost_infiniband ;;
+            5) option_picked "Configure caching nameserver"; configure_caching_nameserver ;;
+            6) console_info_msg "For NAT, firewall and security configuration, select the Security Module from the main menu." ;;
+            0) break ;;
+            *) echo "Invalid option" ;;
         esac
     done
 }
 
-# --- Script execution starts here ---
-show_network_menu
+# Module runs its own menu and exits
+network_config_menu

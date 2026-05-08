@@ -86,36 +86,47 @@ post_deployment_cleanup() {
 show_main_menu() {
     while true; do
         clear
-        echo -e "${BLUE}*************************************************${RESET}"
-        echo -e "${BLUE}**     Dell HPC Warewulf Master Host Config    **${RESET}"
-        echo -e "${BLUE}**               -- Main Menu --               **${RESET}"
-        echo -e "${BLUE}*************************************************${RESET}"
+        echo -e "${BLUE}*****************************************************${RESET}"
+        echo -e "${BLUE}**       Dell HPC Warewulf Master Host Config      **${RESET}"
+        echo -e "${BLUE}**                 -- Main Menu --                 **${RESET}"
+        echo -e "${BLUE}**    OS Distro is: $os_distro - Release $os_version_update      **${RESET}"
+        echo -e "${BLUE}*****************************************************${RESET}"
+                echo_section_header "INITIAL SETUP & INFRASTRUCTURE"
         echo -e "  ${YELLOW}1)${BLUE} Initial Master Node Setup Menu ${RESET}"
         echo -e "  ${YELLOW}2)${BLUE} Network Configuration Menu ${RESET}"
-        echo -e "  ${YELLOW}3)${BLUE} Firmware Update Menu ${RESET}"
-        echo -e "  ${YELLOW}4)${BLUE} Warewulf & Cluster Management Menu ${RESET}"
-        echo -e "  ${YELLOW}5)${BLUE} Warewulf Image Management Menu ${RESET}"
-        echo -e "  ${YELLOW}6)${BLUE} HPC Software Installation Menu ${RESET}"
-        echo -e "  ${YELLOW}7)${BLUE} Monitoring & Security Menu ${RESET}"
-        echo -e "  ${YELLOW}8)${BLUE} Troubleshooting Menu ${RESET}"
-        echo -e "  ${YELLOW}9)${BLUE} Post-Deployment Cleanup ${RESET}"
-        echo -e " ${YELLOW}10)${BLUE} Fabric Software Installation Menu ${RESET}"
-        echo -e " ${YELLOW}11)${BLUE} Exit ${RESET}"
-        echo -e "${BLUE}************************************************${RESET}"
+        echo -e "  ${YELLOW}3)${BLUE} Security Configuration Menu ${RESET}"
+        echo -e "  ${YELLOW}4)${BLUE} Firmware Update Menu ${RESET}"
+        echo ""
+        echo_section_header "WAREWULF & CLUSTER MANAGEMENT"
+        echo -e "  ${YELLOW}5)${BLUE} Warewulf & Cluster Management Menu ${RESET}"
+        echo -e "  ${YELLOW}6)${BLUE} Warewulf Image Management Menu ${RESET}"
+        echo ""
+        echo_section_header "SOFTWARE INSTALLATION"
+        echo -e "  ${YELLOW}7)${BLUE} Fabric Software Installation Menu ${RESET}"
+        echo -e "  ${YELLOW}8)${BLUE} HPC Software Installation Menu ${RESET}"
+        echo ""
+        echo_section_header "OPERATIONS & DIAGNOSTICS"
+        echo -e "  ${YELLOW}9)${BLUE} Monitoring Menu ${RESET}"
+        echo -e " ${YELLOW}10)${BLUE} Troubleshooting Menu ${RESET}"
+        echo -e " ${YELLOW}11)${BLUE} Post-Deployment Cleanup ${RESET}"
+        echo ""
+        echo -e " ${YELLOW}12)${BLUE} Exit ${RESET}"
+        echo -e "${BLUE}*************************************************${RESET}"
         read -p "Enter your choice: " main_choice
 
         case $main_choice in
             1) "${SCRIPT_DIR}/modules/01_master-node-config.sh" ;;
             2) "${SCRIPT_DIR}/modules/02_network-config.sh" ;;
-            3) "${SCRIPT_DIR}/modules/03_firmware-updates.sh" ;;
-            4) "${SCRIPT_DIR}/modules/04_warewulf-setup.sh" ;;
-            5) "${SCRIPT_DIR}/modules/05_ww4-image-management.sh" ;;
-            6) "${SCRIPT_DIR}/modules/06_hpc-shared-software-installs.sh" ;;
-            7) "${SCRIPT_DIR}/modules/07_monitoring-security.sh" ;;
-            8) "${SCRIPT_DIR}/modules/08_troubleshooting.sh" ;;
-            9) post_deployment_cleanup ;;
-            10) "${SCRIPT_DIR}/modules/10_fabric-software-install.sh" ;;
-            11) exit 0 ;;
+            3) "${SCRIPT_DIR}/modules/11_security_nat.sh" ;;
+            4) "${SCRIPT_DIR}/modules/03_firmware-updates.sh" ;;
+            5) "${SCRIPT_DIR}/modules/04_warewulf-setup.sh" ;;
+            6) "${SCRIPT_DIR}/modules/05_ww4-image-management.sh" ;;
+            7) "${SCRIPT_DIR}/modules/10_fabric-software-install.sh" ;;
+            8) "${SCRIPT_DIR}/modules/06_hpc-shared-software-installs.sh" ;;
+            9) "${SCRIPT_DIR}/modules/07_monitoring.sh" ;;
+            10) "${SCRIPT_DIR}/modules/08_troubleshooting.sh" ;;
+            11) post_deployment_cleanup ;;
+            12) exit 0 ;;
             *)
                 echo "Invalid option. Please try again."
                 sleep 2
