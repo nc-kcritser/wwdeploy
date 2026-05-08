@@ -265,8 +265,8 @@ show_fabric_software_menu() {
         echo_menu_header "Fabric Software Installation Menu"
         echo -e "  ${YELLOW}1)${BLUE} DOCA (Online Repository) ${RESET}"
         echo -e "  ${YELLOW}2)${BLUE} DOCA (Downloaded RPM) ${RESET}"
-        echo -e "  ${YELLOW}3)${BLUE} Mellanox OFED ${RESET}"
-        echo -e "  ${YELLOW}4)${BLUE} Cornelis Omni-Path ${RESET}"
+        echo -e "  ${YELLOW}3)${BLUE} Mellanox OFED (Downloaded RPM) ${RESET}"
+        echo -e "  ${YELLOW}4)${BLUE} Cornelis Omni-Path (Downloaded RPM) ${RESET}"
         echo -e "  ${YELLOW}0)${BLUE} Return to Main Menu ${RESET}"
         echo -e "${BLUE}*************************************************${RESET}"
         read -p "Enter your choice: " fabric_choice

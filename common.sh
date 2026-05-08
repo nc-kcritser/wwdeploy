@@ -124,5 +124,7 @@ show_command_output() {
 }
 
 # Base packages for Warewulf container images
-BASE_PACKAGES_CONTAINER="bash coreutils e2fsprogs xfsprogs parted gdisk bind-utils ethtool filesystem findutils gawk grep initscripts iproute iputils net-tools mtr nfs-utils pam psmisc rsync pdsh bc sed setup shadow-utils rsyslog chrony tzdata ntpstat words zlib tar less gzip which util-linux openssh-clients openssh-server dhclient pciutils vim-minimal strace cronie crontabs cpio wget ipmitool yum NetworkManager kernel kernel-devel perl libnl3 tcl tk lsof gcc-gfortran numactl-libs hwloc hwloc-libs lshw hostname dmidecode"
+BASE_PACKAGES_CONTAINER="bash coreutils ignition e2fsprogs xfsprogs parted gdisk bind-utils ethtool filesystem findutils gawk grep initscripts iproute iputils net-tools mtr nfs-utils pam psmisc rsync pdsh bc sed setup shadow-utils rsyslog chrony tzdata ntpstat words zlib tar less gzip which util-linux openssh-clients openssh-server dhclient pciutils vim-minimal strace cronie crontabs cpio wget ipmitool yum NetworkManager kernel kernel-devel perl libnl3 tcl tk lsof gcc-gfortran numactl-libs hwloc hwloc-libs lshw hostname dmidecode"
 export BASE_PACKAGES_CONTAINER
+OHPC_PACKAGES_CONTAINER="ohpc-base-compute ohpc-slurm-client nhc-ohpc lmod-ohpc"
+export OHPC_PACKAGES_CONTAINER

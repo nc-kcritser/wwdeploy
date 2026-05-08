@@ -213,34 +213,6 @@ install_idractools_master() {
 	pause_for_review
 }
 
-# install_mellanox_ofed_master() {
-# 	option_picked "Install Mellanox OFED"
-# 	# Attempt to download Mellanox OFED based on OS version
-# 	case $os_version_major in
-# 		8) wget -nc "$MLNX_OFED_2303_EL8_DL" ;;
-# 		9) wget -nc "$MLNX_OFED_2303_EL9_DL" ;;
-# 	esac
-# 
-# 	mlnx_ofed_file=$(find /root/ -maxdepth 1 -name 'MLNX_OFED_LINUX*.tgz' -print -quit)
-# 	if [ -z "${mlnx_ofed_file}" ];then
-# 		console_fail_msg "Mellanox OFED tarball not found in /root. Please download the file and run this again."
-# 		pause_for_review
-# 		return 1
-# 	fi
-# 
-# 	cd /tmp || return 1
-# 	tar zxf "${mlnx_ofed_file}"
-# 	cd MLNX_OFED_LINUX* || return 1
-# 	./mlnxofedinstall --skip-distro-check --without-32bit --without-fw-update --kmp --enable-opensm -q
-# 	systemctl enable --now opensmd
-# 	cd /tmp || return 1
-# 	rm -rf MLNX_OFED_LINUX* ofed.conf.save ofed.conf
-#     console_taskcomplete_msg "Mellanox OFED installation complete."
-# 	pause_for_review
-# }
-
-# Fabric software installation functions moved to 10_fabric-software-install.sh module
-
 manage_security() {
     local action=$1
     case $action in

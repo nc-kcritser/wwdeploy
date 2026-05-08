@@ -33,13 +33,74 @@ set_container_root_password() {
     local password_hash=$(echo "${image_pw}" | openssl passwd -1 -stdin)
 
     console_taskstart_msg "Applying password to container..."
-    if wwctl container exec "${container_name}" usermod --password "${password_hash}" root; then
+    if wwctl container exec "${container_name}" --build=false -- /sbin/usermod -p '${password_hash}' root; then
         console_taskcomplete_msg "Root password has been set in container '${container_name}'."
         console_info_msg "Remember to rebuild the container image for the change to take effect."
     else
         console_fail_msg "Failed to set root password in container."
     fi
     pause_for_review
+}
+
+configure_container_post_import() {
+    ## Configures the Required Minimal Packages, Password, and OpenHPC Packages.
+    local container_name=$1
+    local container_path=$(wwctl image show "${container_name}" | awk '{print $NF}')
+
+    console_taskstart_msg "Syncing user/group info for ${container_name}..."
+    wwctl container syncuser --write "${container_name}"
+
+    console_taskstart_msg "Enabling EPEL repository in ${container_name}..."
+    wwctl image exec "${container_name}" --build=false -- /usr/bin/dnf -y install ${EPEL_URL} || true
+
+    console_taskstart_msg "Enabling OpenHPC repository in ${container_name}..."
+    wwctl image exec "${container_name}" --build=false -- /usr/bin/dnf -y install ${OpenHPC3_DL} || true
+
+    console_taskstart_msg "Installing prerequisite base packages in ${container_name}..."
+    wwctl image exec "${container_name}" --build=false -- /usr/bin/dnf -y install ${BASE_PACKAGES_CONTAINER}
+
+    console_taskstart_msg "Installing OpenHPC packages in ${container_name}..."
+    wwctl image exec "${container_name}" --build=false -- /usr/bin/dnf -y install ${OHPC_PACKAGES_CONTAINER}
+
+    # Check if Ganglia is installed on the headnode
+    if rpm -q ganglia-gmond &>/dev/null; then
+        read -p "Ganglia is installed on the headnode. Do you want to install ganglia-gmond in the container? (y/n)? " install_ganglia
+        if [[ "$install_ganglia" =~ ^[Yy]$ ]]; then
+            console_taskstart_msg "Installing Ganglia monitoring packages in ${container_name}..."
+            wwctl image exec "${container_name}" --build=false -- /usr/bin/dnf -y install ganglia-gmond
+        else
+            console_info_msg "Skipping Ganglia installation in container."
+        fi
+    fi
+
+    # Configure services (direct file manipulation in CHROOT)
+    #console_taskstart_msg "Configuring DNS in ${container_name}..." - #### THIS MIGHT BE HANDLED WITH TAGS NOW.
+    #perl -pi -e "s/nameserver .*/nameserver $sms_ip/" "${container_path}/etc/resolv.conf"
+
+    console_taskstart_msg "Configuring chrony in ${container_name}..."
+    perl -pi -e "s/pool .*/server $sms_name iburst/" "${container_path}/etc/chrony.conf"
+
+    console_taskstart_msg "Configuring rsyslog forwarding in ${container_name}..."
+    echo "*.* @${sms_ip}:514" >> "${container_path}/etc/rsyslog.conf"
+
+    console_taskstart_msg "Configuring security limits in ${container_name}..."
+    echo '* soft memlock unlimited' >> "${container_path}/etc/security/limits.conf"
+    echo '* hard memlock unlimited' >> "${container_path}/etc/security/limits.conf"
+
+    # Enable services via chroot
+    console_taskstart_msg "Enabling services in ${container_name}..."
+    chroot "${container_path}" /usr/bin/systemctl enable chronyd munge slurmd
+    if [[ "$install_ganglia" =~ ^[Yy]$ ]]; then
+        chroot "${container_path}" /usr/bin/systemctl enable gmond
+    fi
+
+    # Set root password
+    set_container_root_password "${container_name}"
+
+    console_taskstart_msg "Building bootable image for ${container_name}..."
+    wwctl container build "${container_name}"
+
+    console_taskcomplete_msg "Container '${container_name}' configured and built successfully."
 }
 
 configure_container_selinux() {
@@ -122,65 +183,19 @@ create_new_container_from_local_repo() {
     cp /etc/yum.repos.d/OpenHPC.repo "$CHROOT/etc/yum.repos.d/" 2>/dev/null # May not exist yet
     cp /etc/yum.repos.d/$os_id$os_version_full-offline.repo "$CHROOT/etc/yum.repos.d/"
 
-    # Install OpenHPC packages
-    console_taskstart_msg "Installing OpenHPC packages in $container_name"
-    dnf -y --installroot="$CHROOT" install ohpc-base-compute ohpc-slurm-client nhc-ohpc lmod-ohpc 
-    
-    # Check if Ganglia is installed on the headnode
-    if rpm -q ganglia-gmond &>/dev/null; then
-        # Install GMond and Ganglia related packages - Prompt for Ganglia installation
-        read -p "Ganglia is installed on the headnode. Do you want to install ganglia-gmond in the container? (y/n)? " install_ganglia
-        if [[ "$install_ganglia" =~ ^[Yy]$ ]]; then
-            console_taskstart_msg "Installing Ganglia monitoring packages in $container_name"
-            dnf -y --installroot="$CHROOT" install ganglia-gmond 
-        else
-            console_info_msg "Skipping Ganglia installation in container."
-        fi
-    fi
-       
     # Configure SELinux in the container
     configure_container_selinux "$CHROOT"
 
-    # Configure services inside the container
-    console_taskstart_msg "Configuring services within the container"
-    cp -p /etc/resolv.conf "$CHROOT/etc/resolv.conf"
-    if [ -f /etc/ganglia/gmond.conf ]; then
-        cp -p /etc/ganglia/gmond.conf "$CHROOT/etc/ganglia/"
-    fi
-    # Point DNS to master node
-    perl -pi -e "s/nameserver .*/nameserver $sms_ip/" "$CHROOT/etc/resolv.conf"
-    # Point chrony to master node
-    perl -pi -e "s/pool .*/server $sms_name iburst/" "$CHROOT/etc/chrony.conf"
-    # Configure rsyslog forwarding
-    echo "*.* @${sms_ip}:514" >> "$CHROOT/etc/rsyslog.conf"
-    # Configure security limits
-    echo '* soft memlock unlimited' >> "${CHROOT}/etc/security/limits.conf"
-    echo '* hard memlock unlimited' >> "${CHROOT}/etc/security/limits.conf"
-
-    # Enable services via CHROOT
-    console_taskstart_msg "Enabling services in the container"
-    chroot "$CHROOT" systemctl enable chronyd munge slurmd
-    if [[ "$install_ganglia" =~ ^[Yy]$ ]]; then
-        chroot "$CHROOT" systemctl enable gmond
-    fi
-
-    # Import and build the container
+    # Import and configure the container
     console_taskstart_msg "Importing container into Warewulf..."
     wwctl container import "$CHROOT" "$container_name"
-    console_taskstart_msg "Syncing user/group info..."
-    wwctl container syncuser --write "$container_name"
 
-    # Set the root password
-    set_container_root_password "${container_name}"
-
-    console_taskstart_msg "Building bootable image..."
-    wwctl container build "$container_name"
-
-    # Cleanup
+    # Cleanup CHROOT before post-import configuration
     console_taskstart_msg "Cleaning up temporary directory..."
     rm -rf "/tmp/image"
 
-    console_taskcomplete_msg "Container '${container_name}' created and built successfully."
+    # Run post-import configuration (OHPC, services, password, build)
+    configure_container_post_import "${container_name}"
     pause_for_review
 }
 
@@ -232,7 +247,9 @@ download_container_image() {
     console_taskstart_msg "Importing ${image_uri} as '${container_name}'..."
     if wwctl image import "${image_uri}" "${container_name}"; then
         console_taskcomplete_msg "Container '${container_name}' imported successfully."
-        console_info_msg "You may want to build the container now to make it bootable."
+
+        # Run post-import configuration (OHPC, services, password, build)
+        configure_container_post_import "${container_name}"
     else
         console_fail_msg "Failed to import container. Check the image name and your network connection."
     fi
@@ -245,15 +262,57 @@ list_containers() {
     pause_for_review
 }
 
+run_manual_post_processing() {
+    option_picked "Run Manual Post Processing / Prerequisites on a Container"
+
+    mapfile -t containers < <(wwctl image list | awk 'NR>1 && !/^-/ {print $1}')
+    if [ ${#containers[@]} -eq 0 ]; then
+        console_fail_msg "No containers found to configure."
+        pause_for_review
+        return
+    fi
+
+    PS3="Select a container to configure: "
+    select container_name in "${containers[@]}" "Cancel"; do
+        if [[ "$container_name" == "Cancel" ]]; then
+            return
+        elif [[ -n "$container_name" ]]; then
+            break
+        else
+            echo "Invalid selection."
+        fi
+    done
+
+    configure_container_post_import "${container_name}"
+    pause_for_review
+}
+
 build_container() {
     option_picked "Build Warewulf Container"
-    read -p "Enter the name of the container to build: " container_name
-    if wwctl container list | grep -q "^${container_name}\s"; then
-        console_info_msg "Building container: ${container_name}"
-        wwctl container build "${container_name}"
+
+    mapfile -t containers < <(wwctl image list | awk 'NR>1 && !/^-/ {print $1}')
+    if [ ${#containers[@]} -eq 0 ]; then
+        console_fail_msg "No containers found to build."
+        pause_for_review
+        return
+    fi
+
+    PS3="Select a container to build: "
+    select container_name in "${containers[@]}" "Cancel"; do
+        if [[ "$container_name" == "Cancel" ]]; then
+            return
+        elif [[ -n "$container_name" ]]; then
+            break
+        else
+            echo "Invalid selection."
+        fi
+    done
+
+    console_taskstart_msg "Building container: ${container_name}"
+    if wwctl container build "${container_name}"; then
         console_taskcomplete_msg "Build complete for ${container_name}."
     else
-        console_fail_msg "Container '${container_name}' not found."
+        console_fail_msg "Failed to build container '${container_name}'."
     fi
     pause_for_review
 }
@@ -431,20 +490,24 @@ show_image_menu() {
         echo -e "${BLUE}************************************************${RESET}"
         echo -e "  ${YELLOW}1)${BLUE} Create New OS Container (from local repo) ${RESET}"
         echo -e "  ${YELLOW}2)${BLUE} Download Container from Registry (Internet Access Required) ${RESET}"
-        echo -e "  ${YELLOW}3)${BLUE} Modify Existing Container Image (submenu) ${RESET}"
-        echo -e "  ${YELLOW}4)${BLUE} List Existing Containers ${RESET}"
-        echo -e "  ${YELLOW}5)${BLUE} Build an Existing Container ${RESET}"
-        echo -e "  ${YELLOW}6)${BLUE} Return to Main Menu ${RESET}"
+        echo -e "${BLUE}------------------------------------------------${RESET}"
+        echo -e "  ${YELLOW}3)${BLUE} Build Container ${RESET}"
+        echo -e "  ${YELLOW}4)${BLUE} Maintain Container (modify/manage) ${RESET}"
+        echo -e "  ${YELLOW}5)${BLUE} Run Manual Post Processing / Prerequisites ${RESET}"
+        echo -e "${BLUE}------------------------------------------------${RESET}"
+        echo -e "  ${YELLOW}6)${BLUE} List Existing Containers ${RESET}"
+        echo -e "  ${YELLOW}7)${BLUE} Return to Main Menu ${RESET}"
         echo -e "${BLUE}************************************************${RESET}"
         read -p "Enter your choice: " choice
 
         case $choice in
             1) create_new_container_from_local_repo ;;
             2) download_container_image ;;
-            3) show_modify_image_menu ;;
-            4) list_containers ;;
-            5) build_container ;;
-            6) exit_menu=true ;;
+            3) build_container ;;
+            4) show_modify_image_menu ;;
+            5) run_manual_post_processing ;;
+            6) list_containers ;;
+            7) exit_menu=true ;;
             *)
                 echo "Invalid option. Please try again."
                 sleep 2

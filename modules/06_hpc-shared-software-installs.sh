@@ -15,7 +15,7 @@ fi
 # --- HPC Software (as in Shared Software) Installation Functions ---
 
 install_openhpc_packages_master() {
-    option_picked "Install OpenHPC Packages"
+    option_picked "Install OpenHPC Server Packages"
 	
     console_info_msg "Adding OpenHPC repository to master node..."
     # Note: The $OpenHPC3_DL variable should be defined in your sourced vars file.
@@ -25,7 +25,7 @@ install_openhpc_packages_master() {
         pause_for_review
         return 1
     fi
-    console_info_msg "Installing OpenHPC packages..."
+    console_info_msg "Installing OpenHPC Server packages..."
 
 	dnf install -y gcc nhc-ohpc gnu12-compilers-ohpc gnu13-compilers-ohpc ohpc-autotools EasyBuild-ohpc spack-ohpc valgrind-ohpc openmpi5-gnu13-ohpc mpich-ofi-gnu13-ohpc mpich-ucx-gnu13-ohpc ohpc-gnu13-openmpi5-parallel-libs ohpc-gnu13-mpich-parallel-libs ohpc-gnu13-perf-tools lmod-defaults-gnu13-openmpi5-ohpc
     if [ $? -ne 0 ]; then
@@ -119,7 +119,7 @@ show_hpc_software_menu() {
         echo -e "${BLUE}************************************************${RESET}"
         echo -e "${BLUE}** HPC Software Installation Menu         **${RESET}"
         echo -e "${BLUE}************************************************${RESET}"
-        echo -e "  ${YELLOW}1)${BLUE} Install OpenHPC Packages ${RESET}"
+        echo -e "  ${YELLOW}1)${BLUE} Install OpenHPC Server Packages ${RESET}"
         echo -e "  ${YELLOW}2)${BLUE} Go to Warewulf & Cluster Management Menu -> ${RESET}"
         echo -e "  ${YELLOW}3)${BLUE} Install Mellanox HPC-X ${RESET}"
         echo -e "  ${YELLOW}4)${BLUE} Install Intel oneAPI Toolkit ${RESET}"
