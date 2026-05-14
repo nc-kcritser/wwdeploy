@@ -1,6 +1,6 @@
 # Dell-OpenHPC-Warewulf
 
-## HPC deployment scripts for OpenHPC with Warewulf v4.6.4. 
+## HPC deployment scripts for OpenHPC with Warewulf v4.7.0. 
 
 This has been tested with Rocky and Red Hat Enterprise Linux (RHEL) in the 9.x Branch (9.4 - 9.7).  
 As of May 7, 2026 -Warewulf Supports - EL8, EL9 and EL10 flavors 
