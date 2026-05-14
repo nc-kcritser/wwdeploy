@@ -1,0 +1,68 @@
+---
+# Cluster identity
+cluster_name: cluster
+sms_name: warewulf-hn
+external_domain: hpc-lab.org
+search_domains: hpc-lab.org
+
+# DNS
+dns_server_1: 8.8.8.8
+dns_server_2: 1.1.1.1
+dns_server_3: ""
+
+# NTP
+ntp_server: time.google.com
+
+# Networking
+sms_ip: 172.16.0.1
+sms_eth_internal: ens19
+internal_base_net: 172.16.0.0
+internal_netmask: 255.255.252.0
+internal_cidr: 22
+sms_eth_external: ens18
+sms_external_ip: 172.18.10.124
+external_netmask: 255.255.255.0
+external_cidr: 24
+external_gateway: 172.18.10.1
+
+# InfiniBand
+sms_ipoib: 172.16.8.1
+ipoib_base_net: 172.16.8.0
+ipoib_netmask: 255.255.252.0
+ipoib_cidr: 22
+
+# BMC / iDRAC
+bmc_username: root
+bmc_password: calvin
+sms_bmc_user: root
+sms_bmc_passwd: calvin
+sms_bmc_ip_address: 172.16.4.10
+sms_bmc_netmask: 255.255.252.0
+sms_bmc_gateway: 172.16.4.1
+sms_bmc_mgmt: 172.16.4.1
+bmc_base_net: 172.16.4.0
+bmc_netmask: 255.255.252.0
+bmc_cidr: 22
+
+# DHCP
+dynamic_range: 200-200
+dynamic_range_start: 172.16.2.100
+dynamic_range_end: 172.16.2.200
+
+# Passwords
+image_pw: Dellsvcs1
+
+# Download URLs (from reference_external_downloads.config)
+idrac_tools_url: "https://dl.dell.com/FOLDER14347901M/1/Dell-iDRACTools-Web-LX-11.4.1.0-1685_A00.tar.gz"
+
+# Configuration flags (control which tasks run)
+selinux_state: disabled
+firewall_enabled: false
+configure_hostname: true
+configure_dns: true
+configure_ntp: true
+install_prereqs: true
+create_users: true
+configure_local_repo: false
+install_idrac_tools: false
+timezone: UTC
