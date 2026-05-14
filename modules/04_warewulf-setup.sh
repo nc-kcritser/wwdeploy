@@ -79,6 +79,7 @@ configure_warewulf() {
     perl -pi -e "s/10.0.1.255/$dhcp_range_end/g" /etc/warewulf/warewulf.conf
 
     console_info_msg "Enabling NFS shares in warewulf.conf..."
+    ## TODO: Need to validate this works (needs to change /opt to ohpc), mount method changed to noauto
     perl -pi -e 's|path: /opt|path: /opt/ohpc/pub|g' /etc/warewulf/warewulf.conf
     perl -pi -e 's/mount: false/mount: true/g' /etc/warewulf/warewulf.conf
     perl -pi -e 's/rw,sync/rw,sync,no_root_squash/g' /etc/warewulf/warewulf.conf
@@ -219,6 +220,7 @@ create_ww_profile_compute_intel() {
     console_info_msg "Setting up Intel Compute Node Profile - $profile_name using image compute"
     wwctl profile add "$profile_name" --comment "Intel compute nodes" --kernelargs "intel_iommu=on,iommu=pt" --image compute
     console_taskcomplete_msg "Profile '$profile_name' (Intel) created."
+    show_command_output "wwctl profile list $profile_name --yaml"
 }
 
 create_ww_profile_compute_amd() {
@@ -226,6 +228,7 @@ create_ww_profile_compute_amd() {
     console_info_msg "Setting up AMD Compute Node Profile - $profile_name using image compute"
     wwctl profile add "$profile_name" --comment "AMD compute nodes" --kernelargs "iommu=pt,amd_iommu=pt" --image compute
     console_taskcomplete_msg "Profile '$profile_name' (AMD) created."
+    show_command_output "wwctl profile list $profile_name --yaml"
 }
 
 show_compute_profile_submenu() {
@@ -251,6 +254,7 @@ create_ww_profile_bigmem_intel() {
     console_info_msg "Setting up Intel Compute Node Profile - $profile_name using image bigmem"
     wwctl profile add "$profile_name" --comment "Large memory Intel compute nodes" --kernelargs "intel_iommu=on,iommu=pt" --image bigmem
     console_taskcomplete_msg "Profile '$profile_name' (Intel bigmem) created."
+    show_command_output "wwctl profile list $profile_name --yaml"
 }
 
 create_ww_profile_bigmem_amd() {
@@ -258,6 +262,7 @@ create_ww_profile_bigmem_amd() {
     console_info_msg "Setting up AMD Compute Node Profile - $profile_name using image bigmem"
     wwctl profile add "$profile_name" --comment "Large memory AMD compute nodes" --kernelargs "iommu=pt,amd_iommu=pt" --image bigmem
     console_taskcomplete_msg "Profile '$profile_name' (AMD bigmem) created."
+    show_command_output "wwctl profile list $profile_name --yaml"
 }
 
 show_bigmem_profile_submenu() {
@@ -281,24 +286,38 @@ show_bigmem_profile_submenu() {
 create_ww_profile_gpu() {
     wwctl profile add gpu --comment "Nodes with Nvidia GPU" --kernelargs "quiet,crashkernel=no,vga=791,modprobe.blacklist=nouveau" --image gpu
     console_taskcomplete_msg "Profile 'gpu' created."
+    show_command_output "wwctl profile list gpu --yaml"
     pause_for_review
 }
 
 create_ww_profile_login() {
     wwctl profile add login --comment "User login node" --image login
     console_taskcomplete_msg "Profile 'login' created."
+    show_command_output "wwctl profile list login --yaml"
     pause_for_review
 }
 
 create_ww_profile_storage() {
-    wwctl profile add storage --comment "Storage node" -image storage
+    wwctl profile add storage --comment "Storage node" --image storage
     console_taskcomplete_msg "Profile 'storage' created."
+    show_command_output "wwctl profile list storage --yaml"
+    pause_for_review
+}
+
+create_ww_profile_ib_boot() {
+    option_picked "Create IB-Boot Profile"
+    wwctl profile add ib-boot --comment "SetUp to allow the node to boot from ib" \
+        --kernelargs "rd.driver.pre=mlx5_ib,rd.driver.pre=ib_ipoib" \
+        --netname internal --netdev=ib0 --type=infiniband
+    console_taskcomplete_msg "Profile 'ib-boot' created."
+    show_command_output "wwctl profile list ib-boot --yaml"
     pause_for_review
 }
 
 create_ww_profile_unmanaged() {
     wwctl profile add unmanaged --comment "Unmanaged Node - Used for Creating Host Entries"
     console_taskcomplete_msg "Profile 'Unmanaged' created."
+    show_command_output "wwctl profile list unmanaged --yaml"
     pause_for_review
 }
 
@@ -310,7 +329,8 @@ show_profiles_submenu() {
         echo -e "  ${YELLOW}3)${BLUE} Nvidia GPU ${RESET}"
         echo -e "  ${YELLOW}4)${BLUE} Login ${RESET}"
         echo -e "  ${YELLOW}5)${BLUE} Storage ${RESET}"
-        echo -e "  ${YELLOW}6)${BLUE} Unmanaged Node ${RESET}"
+        echo -e "  ${YELLOW}6)${BLUE} IB-Boot ${RESET}"
+        echo -e "  ${YELLOW}7)${BLUE} Unmanaged Node ${RESET}"
         echo -e "  ${YELLOW}0)${BLUE} Return to previous menu ${RESET}"
         read -p "Enter your choice: " prof_choice
         case $prof_choice in
@@ -319,7 +339,8 @@ show_profiles_submenu() {
             3) create_ww_profile_gpu ;;
             4) create_ww_profile_login ;;
             5) create_ww_profile_storage ;;
-            6) create_ww_profile_unmanaged ;;
+            6) create_ww_profile_ib_boot ;;
+            7) create_ww_profile_unmanaged ;;
             0) break ;;
             *) echo "Invalid choice." ; sleep 2 ;;
         esac

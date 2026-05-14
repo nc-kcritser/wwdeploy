@@ -1,0 +1,24 @@
+FROM ghcr.io/warewulf/warewulf-rockylinux:9.5
+
+
+RUN dnf install -y epel-release
+
+RUN dnf install -y http://repos.openhpc.community/OpenHPC/3/EL_9/x86_64/ohpc-release-3-1.el9.x86_64.rpm
+
+RUN dnf install -y bash coreutils glibc-langpack-en ignition e2fsprogs xfsprogs parted gdisk bind-utils ethtool filesystem findutils gawk grep initscripts iproute iputils net-tools mtr nfs-utils pam psmisc rsync pdsh bc sed setup shadow-utils rsyslog chrony tzdata ntpstat words zlib tar less gzip which util-linux openssh-clients openssh-server dhclient pciutils vim-minimal strace cronie crontabs cpio wget ipmitool yum NetworkManager kernel kernel-devel perl libnl3 tcl tk lsof gcc-gfortran numactl-libs hwloc hwloc-libs lshw hostname dmidecode
+
+RUN dnf install -y ohpc-base-compute ohpc-slurm-client nhc-ohpc lmod-ohpc
+
+RUN echo '* soft memlock unlimited' >> /etc/security/limits.conf && \
+    echo '* hard memlock unlimited' >> /etc/security/limits.conf
+
+RUN systemctl enable chronyd munge slurmd
+
+RUN echo 'root:SamplePW1!' | chpasswd
+
+COPY ../support/iDRACTools/racadm/RHEL9/x86_64/*.rpm /tmp/racadm-rpms/
+
+RUN dnf localinstall -y /tmp/racadm-rpms/*.rpm && \
+    rm -rf /tmp/racadm-rpms/
+
+RUN echo 'export PATH="$PATH:/opt/dell/srvadmin/sbin"' > /etc/profile.d/dractools.sh

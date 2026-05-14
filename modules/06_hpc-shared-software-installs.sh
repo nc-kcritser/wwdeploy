@@ -39,6 +39,7 @@ install_openhpc_packages_master() {
 
 install_mellanox_hpcx() {
     option_picked "Install Mellanox HPC-X"
+    ## TODO: Re-wrap and build multiple versions of HPC-X using modules
 	wget -nc "$HPCX218_URL"
 	hpcx_file=$(find /root -maxdepth 1 -name 'hpcx*.tbz' -print -quit)
 	if [ -z "${hpcx_file}" ];then
@@ -60,6 +61,7 @@ install_mellanox_hpcx() {
 
 install_intel_oneapi() {
     option_picked "Install Intel oneAPI"
+    ## TODO: Update and Versions (now 2026, and old 2025) Intel One API
     PS3='Select oneAPI version to install: '
 	options=( "2023.1.0" "2024.0.1" "2025.0.0" "Cancel" )
 	select opt in "${options[@]}"; do
@@ -84,6 +86,7 @@ install_intel_oneapi() {
 
 install_nvidia_cuda() {
     option_picked "Install Nvidia CUDA Toolkit"
+    ## TODO: Update and Validate NVIDIA CUDA
 	cuda_file=$(find /root -maxdepth 1 -name 'cuda*.run' -print -quit)
     if [ -z "${cuda_file}" ]; then
         console_fail_msg "Nvidia CUDA runfile not found in /root. Please download and run again."
@@ -112,44 +115,27 @@ EOF
 }
 
 
-# --- Sub-Menu for this script ---
-show_hpc_software_menu() {
+hpc_software_menu() {
+    local option
     while true; do
-        clear
-        echo -e "${BLUE}************************************************${RESET}"
-        echo -e "${BLUE}** HPC Software Installation Menu         **${RESET}"
-        echo -e "${BLUE}************************************************${RESET}"
-        echo -e "  ${YELLOW}1)${BLUE} Install OpenHPC Server Packages ${RESET}"
-        echo -e "  ${YELLOW}2)${BLUE} Go to Warewulf & Cluster Management Menu -> ${RESET}"
-        echo -e "  ${YELLOW}3)${BLUE} Install Mellanox HPC-X ${RESET}"
-        echo -e "  ${YELLOW}4)${BLUE} Install Intel oneAPI Toolkit ${RESET}"
-        echo -e "  ${YELLOW}5)${BLUE} Install Nvidia CUDA Toolkit ${RESET}"
-        echo -e "  ${YELLOW}6)${BLUE} Return to Main Menu ${RESET}"
-        echo -e "${BLUE}************************************************${RESET}"
-        read -p "Enter your choice: " hpc_choice
-
-        case $hpc_choice in
+        echo_menu_header "HPC Software Installation"
+        echo " 1) Install OpenHPC Server Packages"
+        echo " 2) Install Mellanox HPC-X"
+        echo " 3) Install Intel oneAPI Toolkit"
+        echo " 4) Install Nvidia CUDA Toolkit"
+        echo " 0) Return to main menu"
+        read -r -p "=> " option
+        case $option in
             1) install_openhpc_packages_master ;;
-            2)
-                if [ -f ./warewulf-config.sh ]; then
-                    ./warewulf-config.sh
-                else
-                    console_fail_msg "warewulf-config.sh not found in the current directory."
-                    pause_for_review
-                fi
-                ;;
-            3) install_mellanox_hpcx ;;
-            4) install_intel_oneapi ;;
-            5) install_nvidia_cuda ;;
-            6) exit 0 ;;
-            *)
-                echo "Invalid option. Please try again."
-                sleep 2
-                ;;
+            2) install_mellanox_hpcx ;;
+            3) install_intel_oneapi ;;
+            4) install_nvidia_cuda ;;
+            0) break ;;
+            *) echo "Invalid option" ;;
         esac
     done
 }
 
-# --- Script execution starts here ---
-show_hpc_software_menu
+# Module runs its own menu and exits
+hpc_software_menu
                                                                                                                                                                                                       

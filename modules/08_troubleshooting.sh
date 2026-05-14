@@ -102,8 +102,6 @@ check_services() {
         munge
         dhcpd
         tftp.socket
-        gmond
-        gmetad
         chronyd
         named
         fail2ban

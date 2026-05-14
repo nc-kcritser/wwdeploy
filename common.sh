@@ -87,8 +87,14 @@ echo_menu_header() {
 	MESSAGE=${@:-"${RESET}Error: No message passed"}
 	echo -e "${BLUE}************************************************************************************************${RESET}"
 	echo -e "           ${YELLOW}${MESSAGE}                                                           ${RESET}"
-	echo -e "           ${YELLOW}OS Distro is: $os_distro - Major Release $os_version_major         ${RESET}"
+	echo -e "           ${YELLOW}OS Distro is: $os_distro - Release $os_version_update             ${RESET}"
 	echo -e "${BLUE}************************************************************************************************${RESET}"
+}
+
+# Displays a section header within a menu (e.g., to separate groups of options).
+echo_section_header() {
+	MESSAGE=${@:-"${RESET}Error: No message passed"}
+	echo -e "${YELLOW}=== ${MESSAGE} ===${RESET}"
 }
 
 # Displays a success message for a completed task.
@@ -124,7 +130,7 @@ show_command_output() {
 }
 
 # Base packages for Warewulf container images
-BASE_PACKAGES_CONTAINER="bash coreutils ignition e2fsprogs xfsprogs parted gdisk bind-utils ethtool filesystem findutils gawk grep initscripts iproute iputils net-tools mtr nfs-utils pam psmisc rsync pdsh bc sed setup shadow-utils rsyslog chrony tzdata ntpstat words zlib tar less gzip which util-linux openssh-clients openssh-server dhclient pciutils vim-minimal strace cronie crontabs cpio wget ipmitool yum NetworkManager kernel kernel-devel perl libnl3 tcl tk lsof gcc-gfortran numactl-libs hwloc hwloc-libs lshw hostname dmidecode"
+BASE_PACKAGES_CONTAINER="bash coreutils glibc-langpack-en ignition e2fsprogs xfsprogs parted gdisk bind-utils ethtool filesystem findutils gawk grep initscripts iproute iputils net-tools mtr nfs-utils pam psmisc rsync pdsh bc sed setup shadow-utils rsyslog chrony tzdata ntpstat words zlib tar less gzip which util-linux openssh-clients openssh-server dhclient pciutils vim-minimal strace cronie crontabs cpio wget ipmitool yum NetworkManager kernel kernel-devel perl libnl3 tcl tk lsof gcc-gfortran numactl-libs hwloc hwloc-libs lshw hostname dmidecode"
 export BASE_PACKAGES_CONTAINER
 OHPC_PACKAGES_CONTAINER="ohpc-base-compute ohpc-slurm-client nhc-ohpc lmod-ohpc"
 export OHPC_PACKAGES_CONTAINER
