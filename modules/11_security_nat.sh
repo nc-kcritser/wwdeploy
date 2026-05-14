@@ -36,7 +36,9 @@ enable_configure_firewalld() {
 	firewall-cmd --permanent --zone=public --add-service=ssh
 	firewall-cmd --permanent --zone=public --add-service=http
 	firewall-cmd --permanent --zone=public --add-service=https
-
+	console_info_msg "Configuring warewulf firewall rule - if this fails, you likely havent installed warewulf yet..."
+	firewall-cmd --permanent --zone=public --add-service=warewulf
+	
 	console_info_msg "Reloading firewall to apply changes..."
 	firewall-cmd --reload
     console_taskcomplete_msg "Firewalld configured for cluster operation."
@@ -45,6 +47,7 @@ enable_configure_firewalld() {
 
 secure_sshd_with_fail2ban() {
     option_picked "Secure SSHD with Fail2Ban"
+    console_info_msg "Fail2Ban monitors SSHD login attempts and automatically bans IPs that exceed the failed login threshold (default: 1 hour ban). It installs a systemd service and modifies /etc/fail2ban/jail.local."
 	dnf install -y fail2ban
 	cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local
 

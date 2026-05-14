@@ -183,7 +183,7 @@ network_config_menu() {
         echo " 3) Configure external ethernet interface"
         echo " 4) Configure InfiniBand interface"
         echo " 5) Configure caching nameserver"
-        echo " 6) Configure firewall and security (see Security Module)"
+        echo " 6) Configure firewall and security"
         echo " 0) Return to main menu"
         read -r -p "=> " option
         case $option in
@@ -192,7 +192,7 @@ network_config_menu() {
             3) option_picked "Configure external ethernet interface"; interface_config_masterhost_external ;;
             4) option_picked "Configure InfiniBand interface"; interface_config_masterhost_infiniband ;;
             5) option_picked "Configure caching nameserver"; configure_caching_nameserver ;;
-            6) console_info_msg "For NAT, firewall and security configuration, select the Security Module from the main menu." ;;
+            6) "${SCRIPT_DIR}/modules/11_security_nat.sh" ;;
             0) break ;;
             *) echo "Invalid option" ;;
         esac
