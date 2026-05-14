@@ -79,6 +79,7 @@ configure_warewulf() {
     perl -pi -e "s/10.0.1.255/$dhcp_range_end/g" /etc/warewulf/warewulf.conf
 
     console_info_msg "Enabling NFS shares in warewulf.conf..."
+    ## TODO: Need to validate this works (needs to change /opt to ohpc), mount method changed to noauto
     perl -pi -e 's|path: /opt|path: /opt/ohpc/pub|g' /etc/warewulf/warewulf.conf
     perl -pi -e 's/mount: false/mount: true/g' /etc/warewulf/warewulf.conf
     perl -pi -e 's/rw,sync/rw,sync,no_root_squash/g' /etc/warewulf/warewulf.conf
