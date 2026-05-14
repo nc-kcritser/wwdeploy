@@ -4,19 +4,6 @@
   become: true
   gather_facts: true
 
-  vars:
-    # Configuration flags - control which sections run (override with -e)
-    selinux_state: disabled
-    firewall_enabled: false
-    configure_hostname: true
-    configure_dns: true
-    configure_ntp: true
-    install_prereqs: true
-    create_users: true
-    configure_local_repo: false
-    install_idrac_tools: false
-    timezone: UTC
-
   tasks:
     # ============================================================================
     # PREREQS TAG: Install EPEL, core packages, development tools, CRB/PowerTools
