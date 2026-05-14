@@ -1,0 +1,401 @@
+---
+- name: Master Node Configuration (Module 01)
+  hosts: master
+  become: true
+  gather_facts: true
+
+  vars:
+    # Configuration flags - control which sections run (override with -e)
+    selinux_state: disabled
+    firewall_enabled: false
+    configure_hostname: true
+    configure_dns: true
+    configure_ntp: true
+    install_prereqs: true
+    create_users: true
+    configure_local_repo: false
+    install_idrac_tools: false
+    timezone: UTC
+
+  tasks:
+    # ============================================================================
+    # PREREQS TAG: Install EPEL, core packages, development tools, CRB/PowerTools
+    # ============================================================================
+    - name: "PREREQS: Install EPEL repository"
+      tags: prereqs
+      when: install_prereqs
+      block:
+        - name: Get EPEL repo URL for EL{{ ansible_distribution_major_version }}
+          set_fact:
+            epel_url: "https://dl.fedoraproject.org/pub/epel/epel-release-latest-{{ ansible_distribution_major_version }}.noarch.rpm"
+
+        - name: Install EPEL repo
+          ansible.builtin.dnf:
+            name: "{{ epel_url }}"
+            state: present
+            disable_gpg_check: true
+
+        - name: Disable GPG check for EPEL repo
+          ansible.builtin.ini_file:
+            path: /etc/yum.repos.d/epel.repo
+            section: epel
+            option: gpgcheck
+            value: "0"
+            no_extra_spaces: true
+
+    - name: "PREREQS: Install core and development packages"
+      tags: prereqs
+      when: install_prereqs
+      block:
+        - name: Install core packages (all distros)
+          ansible.builtin.dnf:
+            name:
+              - dnf-plugins-core
+              - vim
+              - tmux
+              - screen
+              - dialog
+              - tar
+              - rsync
+              - perl
+              - wget
+              - nfs-utils
+              - bind-utils
+              - dmidecode
+              - hwloc
+              - hwloc-libs
+              - net-tools
+              - ntpstat
+              - pciutils
+              - lsof
+              - tk
+              - tcl
+              - gcc-gfortran
+              - createrepo
+              - ipmitool
+              - ipcalc
+              - golang
+              - python3-clustershell
+              - xorg-x11-xauth
+              - firefox
+            state: present
+
+        - name: Install Development Tools group
+          ansible.builtin.dnf:
+            name: "@Development Tools"
+            state: present
+
+    - name: "PREREQS: Enable CRB/PowerTools repository"
+      tags: prereqs
+      when: install_prereqs
+      block:
+        - name: Enable PowerTools (Rocky Linux 8)
+          ansible.builtin.command: dnf config-manager --set-enabled powertools
+          when:
+            - ansible_distribution == "Rocky Linux"
+            - ansible_distribution_major_version == "8"
+          changed_when: false
+
+        - name: Enable CRB (Rocky Linux 9)
+          ansible.builtin.command: dnf config-manager --set-enabled crb
+          when:
+            - ansible_distribution == "Rocky Linux"
+            - ansible_distribution_major_version == "9"
+          changed_when: false
+
+        - name: Enable CodeReady Builder (RHEL)
+          ansible.builtin.command: subscription-manager repos --enable=codeready-builder-for-rhel-{{ ansible_distribution_major_version }}-x86_64-rpms
+          when: ansible_distribution == "RedHat"
+          changed_when: false
+          failed_when: false
+
+    # ============================================================================
+    # LOCAL_REPO TAG: Mount ISO, rsync contents, create local yum repo
+    # ============================================================================
+    - name: "LOCAL_REPO: Find and mount OS ISO"
+      tags: local_repo
+      when: configure_local_repo
+      block:
+        - name: Find OS ISO in /root
+          ansible.builtin.find:
+            paths: /root
+            patterns: "R*.iso"
+            file_type: file
+            depth: 1
+          register: iso_files
+
+        - name: Fail if no ISO found
+          ansible.builtin.fail:
+            msg: "No OS ISO (R*.iso) found in /root. Please upload the ISO and try again."
+          when: iso_files.matched == 0
+
+        - name: Set ISO path fact
+          set_fact:
+            os_iso: "{{ iso_files.files[0].path }}"
+
+        - name: Create repo backup directory
+          ansible.builtin.file:
+            path: /root/repo_backup
+            state: directory
+            mode: '0755'
+
+        - name: Backup existing repo files
+          ansible.builtin.shell: cp /etc/yum.repos.d/*.repo /root/repo_backup/ 2>/dev/null || true
+
+        - name: Remove online repos
+          ansible.builtin.file:
+            path: "{{ item }}"
+            state: absent
+          loop:
+            - /etc/yum.repos.d/rocky.repo
+            - /etc/yum.repos.d/redhat.repo
+
+        - name: Create repo directory structure
+          ansible.builtin.file:
+            path: "/opt/ohpc/pub/repo/{{ ansible_distribution | lower }}{{ ansible_distribution_version }}"
+            state: directory
+            mode: '0755'
+
+        - name: Create ISO mount point
+          ansible.builtin.file:
+            path: /mnt/iso
+            state: directory
+            mode: '0755'
+
+        - name: Mount ISO
+          ansible.posix.mount:
+            path: /mnt/iso
+            src: "{{ os_iso }}"
+            fstype: iso9660
+            opts: loop,ro
+            state: mounted
+
+        - name: Check if rsync is installed
+          ansible.builtin.package_facts:
+            manager: auto
+          register: pkg_mgr
+
+        - name: Find rsync RPM on ISO
+          ansible.builtin.find:
+            paths: /mnt/iso/BaseOS/Packages/r
+            patterns: "rsync*.rpm"
+            file_type: file
+          register: rsync_files
+          when: "'rsync' not in pkg_mgr.ansible_facts.packages"
+
+        - name: Install rsync from ISO if not present
+          ansible.builtin.dnf:
+            name: "{{ rsync_files.files[0].path }}"
+            state: present
+          when:
+            - "'rsync' not in pkg_mgr.ansible_facts.packages"
+            - rsync_files.matched > 0
+
+        - name: Sync ISO contents to repo
+          ansible.posix.synchronize:
+            src: /mnt/iso/
+            dest: "/opt/ohpc/pub/repo/{{ ansible_distribution | lower }}{{ ansible_distribution_version }}/"
+            archive: true
+            delete: false
+          delegate_to: "{{ inventory_hostname }}"
+
+        - name: Unmount ISO
+          ansible.posix.mount:
+            path: /mnt/iso
+            state: unmounted
+
+        - name: Remove ISO mount point directory
+          ansible.builtin.file:
+            path: /mnt/iso
+            state: absent
+
+        - name: Create local repo file
+          ansible.builtin.copy:
+            content: |
+              [BaseOS-LocalRepo]
+              name=BaseOS Packages {{ ansible_distribution }} {{ ansible_distribution_version }} Linux - Offline (Local)
+              metadata_expire=-1
+              gpgcheck=0
+              enabled=1
+              baseurl=file:///opt/ohpc/pub/repo/{{ ansible_distribution | lower }}{{ ansible_distribution_version }}/BaseOS/
+              gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+
+              [AppStream-LocalRepo]
+              name=AppStream Packages {{ ansible_distribution }} {{ ansible_distribution_version }} Offline (Local)
+              metadata_expire=-1
+              gpgcheck=0
+              enabled=1
+              baseurl=file:///opt/ohpc/pub/repo/{{ ansible_distribution | lower }}{{ ansible_distribution_version }}/AppStream/
+              gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+            dest: "/etc/yum.repos.d/{{ ansible_distribution | lower }}{{ ansible_distribution_version }}-offline.repo"
+            mode: '0644'
+
+    # ============================================================================
+    # IDRAC TAG: Download and install Dell iDRAC Tools
+    # ============================================================================
+    - name: "IDRAC: Install Dell iDRAC Tools"
+      tags: idrac
+      when: install_idrac_tools
+      block:
+        - name: Check if iDRAC tools tarball already exists
+          ansible.builtin.stat:
+            path: "/root/Dell-iDRACTools-Web-LX-11.4.1.0-1685_A00.tar.gz"
+          register: idrac_tarball
+
+        - name: Download iDRAC Tools
+          ansible.builtin.get_url:
+            url: "{{ idrac_tools_url }}"
+            dest: /root/
+            force: false
+            mode: '0644'
+            timeout: 300
+          when: not idrac_tarball.stat.exists
+
+        - name: Extract iDRAC Tools tarball
+          ansible.builtin.unarchive:
+            src: "{{ idrac_tarball.stat.path if idrac_tarball.stat.exists else '/root/Dell-iDRACTools-Web-LX-11.4.1.0-1685_A00.tar.gz' }}"
+            dest: /tmp/
+            remote_src: true
+          register: idrac_extracted
+
+        - name: Install iDRAC Tools RPMs
+          ansible.builtin.shell: |
+            set -e
+            cd /tmp/iDRACTools/racadm/RHEL{{ ansible_distribution_major_version }}/x86_64
+            rm -f srvadmin-selinux*.rpm srvadmin-tomcat*.rpm
+            dnf localinstall -y *.rpm
+          args:
+            executable: /bin/bash
+
+        - name: Clean up extracted iDRAC files
+          ansible.builtin.file:
+            path: "{{ item }}"
+            state: absent
+          loop:
+            - /tmp/iDRACTools
+            - /tmp/license.txt
+            - /tmp/COPYRIGHT.txt
+
+        - name: Create dractools shell profile
+          ansible.builtin.copy:
+            content: |
+              export PATH="$PATH:/opt/dell/srvadmin/sbin"
+            dest: /etc/profile.d/dractools.sh
+            mode: '0644'
+
+    # ============================================================================
+    # SECURITY TAG: SELinux and Firewall configuration
+    # ============================================================================
+    - name: "SECURITY: Configure SELinux"
+      tags: security
+      ansible.posix.selinux:
+        policy: targeted
+        state: "{{ selinux_state }}"
+
+    - name: "SECURITY: Manage firewalld service"
+      tags: security
+      block:
+        - name: Enable and start firewalld
+          ansible.builtin.systemd:
+            name: firewalld
+            enabled: true
+            state: started
+          when: firewall_enabled
+
+        - name: Disable and stop firewalld
+          ansible.builtin.systemd:
+            name: firewalld
+            enabled: false
+            state: stopped
+          when: not firewall_enabled
+
+    # ============================================================================
+    # HOSTNAME TAG: Set hostname
+    # ============================================================================
+    - name: "HOSTNAME: Set system hostname"
+      tags: hostname
+      when: configure_hostname
+      ansible.builtin.hostname:
+        name: "{{ sms_name }}"
+        use: systemd
+
+    # ============================================================================
+    # DNS TAG: Configure DNS/resolv.conf
+    # ============================================================================
+    - name: "DNS: Configure /etc/resolv.conf"
+      tags: dns
+      when: configure_dns
+      ansible.builtin.copy:
+        content: |
+          {% if search_domains %}
+          search {{ search_domains }}
+          {% endif %}
+          {% if dns_server_1 %}
+          nameserver {{ dns_server_1 }}
+          {% endif %}
+          {% if dns_server_2 %}
+          nameserver {{ dns_server_2 }}
+          {% endif %}
+          {% if dns_server_3 %}
+          nameserver {{ dns_server_3 }}
+          {% endif %}
+        dest: /etc/resolv.conf
+        mode: '0644'
+
+    # ============================================================================
+    # NTP TAG: Configure timezone and Chrony NTP
+    # ============================================================================
+    - name: "NTP: Set timezone"
+      tags: ntp
+      when: configure_ntp
+      community.general.timezone:
+        name: "{{ timezone }}"
+
+    - name: "NTP: Configure Chrony NTP server"
+      tags: ntp
+      when: configure_ntp
+      ansible.builtin.replace:
+        path: /etc/chrony.conf
+        regexp: "^pool .*"
+        replace: "server {{ ntp_server }} iburst"
+
+    - name: "NTP: Restart Chronyd service"
+      tags: ntp
+      when: configure_ntp
+      ansible.builtin.systemd:
+        name: chronyd
+        state: restarted
+        enabled: true
+
+    # ============================================================================
+    # USERS TAG: Create local groups and users
+    # ============================================================================
+    - name: "USERS: Create dell group"
+      tags: users
+      when: create_users
+      ansible.builtin.group:
+        name: dell
+        gid: 4999
+        state: present
+
+    - name: "USERS: Create HPL user"
+      tags: users
+      when: create_users
+      ansible.builtin.user:
+        name: hpl
+        uid: 4999
+        group: dell
+        comment: "High Performance Linpack"
+        createhome: true
+        state: present
+
+    - name: "USERS: Create GPU user"
+      tags: users
+      when: create_users
+      ansible.builtin.user:
+        name: gpu
+        uid: 4998
+        group: dell
+        comment: "Nvidia CUDA HPL"
+        createhome: true
+        state: present
