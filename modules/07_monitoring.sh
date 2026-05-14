@@ -74,6 +74,10 @@ EOF
 	pause_for_review
 }
 
+install_configure_prometheus_node_exporter() {
+    ## TODO: Build config from Prometheus
+}
+
 # --- Main Menu for this script ---
 monitoring_menu() {
     local option

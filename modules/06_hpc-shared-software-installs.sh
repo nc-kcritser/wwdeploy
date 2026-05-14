@@ -39,6 +39,7 @@ install_openhpc_packages_master() {
 
 install_mellanox_hpcx() {
     option_picked "Install Mellanox HPC-X"
+    ## TODO: Re-wrap and build multiple versions of HPC-X using modules
 	wget -nc "$HPCX218_URL"
 	hpcx_file=$(find /root -maxdepth 1 -name 'hpcx*.tbz' -print -quit)
 	if [ -z "${hpcx_file}" ];then
@@ -60,6 +61,7 @@ install_mellanox_hpcx() {
 
 install_intel_oneapi() {
     option_picked "Install Intel oneAPI"
+    ## TODO: Update and Versions (now 2026, and old 2025) Intel One API
     PS3='Select oneAPI version to install: '
 	options=( "2023.1.0" "2024.0.1" "2025.0.0" "Cancel" )
 	select opt in "${options[@]}"; do
@@ -84,6 +86,7 @@ install_intel_oneapi() {
 
 install_nvidia_cuda() {
     option_picked "Install Nvidia CUDA Toolkit"
+    ## TODO: Update and Validate NVIDIA CUDA
 	cuda_file=$(find /root -maxdepth 1 -name 'cuda*.run' -print -quit)
     if [ -z "${cuda_file}" ]; then
         console_fail_msg "Nvidia CUDA runfile not found in /root. Please download and run again."
@@ -123,10 +126,10 @@ hpc_software_menu() {
         echo " 0) Return to main menu"
         read -r -p "=> " option
         case $option in
-            1) option_picked "Install OpenHPC Server Packages"; install_openhpc_packages_master ;;
-            2) option_picked "Install Mellanox HPC-X"; install_mellanox_hpcx ;;
-            3) option_picked "Install Intel oneAPI Toolkit"; install_intel_oneapi ;;
-            4) option_picked "Install Nvidia CUDA Toolkit"; install_nvidia_cuda ;;
+            1) install_openhpc_packages_master ;;
+            2) install_mellanox_hpcx ;;
+            3) install_intel_oneapi ;;
+            4) install_nvidia_cuda ;;
             0) break ;;
             *) echo "Invalid option" ;;
         esac

@@ -1,4 +1,4 @@
-FROM ghcr.io/warewulf/warewulf-rockylinux:9.7
+FROM ghcr.io/warewulf/warewulf-rockylinux:9.6
 
 RUN dnf install -y epel-release
 

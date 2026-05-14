@@ -13,6 +13,7 @@ fi
 # --- Reusable Helper Functions ---
 
 set_container_root_password() {
+    # TODO: redesign using the chpassword method
     local container_name=$1
     option_picked "Set Root Password for ${container_name}"
 
@@ -43,6 +44,7 @@ set_container_root_password() {
 }
 
 configure_container_post_import() {
+    ## TODO: Redesign Container POST Import 
     ## Configures the Required Minimal Packages, Password, and OpenHPC Packages.
     local container_name=$1
     local container_path=$(wwctl image show "${container_name}" | awk '{print $NF}')
@@ -199,6 +201,11 @@ create_new_container_from_local_repo() {
     pause_for_review
 }
 
+build_podman_container_image() {
+    ## TODO: Plan to adopt the podman method of importing Rocky containers. 
+
+}
+
 download_container_image() {
     option_picked "Download Container from Registry"
     
@@ -339,7 +346,11 @@ install_container_base_packages() {
     pause_for_review
 }
 
+modify_image_add_prometheus_exporter() {
+    ## TODO: Write code to add node exporter
+    ## Adjust if image will need dcgm exporter.
 
+}
 
 
 modify_container_add_ganglia() {
@@ -404,6 +415,7 @@ modify_container_add_nvidia_repo() {
 }
 
 show_nvidia_submenu() {
+    ## TODO: Update Code base of NVIDIA (primary Repo, then run file.)
     local container_name=$1
     local exit_submenu=false
     while [ "$exit_submenu" = false ]; do
