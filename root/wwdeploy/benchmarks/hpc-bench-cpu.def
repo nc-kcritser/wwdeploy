@@ -1,0 +1,247 @@
+Bootstrap: docker
+From: rockylinux:9
+
+%labels
+    Maintainer HPC Team
+    Version 1.0
+    Description CPU benchmark container: HPL, HPCG, STREAM
+    CUDA none
+    Fabrics IB, RoCE, Ethernet
+
+%post
+    set -e
+
+    # --- Versions ---
+    UCX_VERSION=1.17.0
+    OMPI_VERSION=5.0.6
+    OPENBLAS_VERSION=0.3.27
+    HPL_VERSION=2.3
+    HPCG_VERSION=3.1
+    STREAM_ARRAY_SIZE=80000000
+
+    # --- Base packages ---
+    dnf -y update
+    dnf -y install epel-release
+    dnf -y install \
+        gcc gcc-c++ gcc-gfortran make cmake wget tar bzip2 gzip \
+        python3 python3-pip numactl numactl-devel hwloc hwloc-devel \
+        libibverbs libibverbs-devel rdma-core rdma-core-devel \
+        librdmacm librdmacm-devel libibumad libibumad-devel \
+        infiniband-diags perftest \
+        openssh-clients openssh-server \
+        pdsh perl which file hostname \
+        libevent libevent-devel zlib zlib-devel \
+        flex flex-devel bison
+    dnf clean all
+
+    # --- UCX (IB + RoCE + TCP transports) ---
+    cd /tmp
+    wget -q https://github.com/openucx/ucx/releases/download/v${UCX_VERSION}/ucx-${UCX_VERSION}.tar.gz
+    tar xf ucx-${UCX_VERSION}.tar.gz
+    cd ucx-${UCX_VERSION}
+    ./configure \
+        --prefix=/opt/ucx \
+        --with-verbs \
+        --with-rdmacm \
+        --without-cuda \
+        --without-java \
+        --enable-optimizations \
+        --disable-logging \
+        --disable-debug \
+        --disable-assertions \
+        --disable-params-check \
+        > /dev/null
+    make -j$(nproc) install
+    cd /tmp && rm -rf ucx-${UCX_VERSION}*
+
+    # --- PMIx ---
+    cd /tmp
+    wget -q https://github.com/pmix/pmix/releases/download/v4.2.9/pmix-4.2.9.tar.gz
+    tar xf pmix-4.2.9.tar.gz
+    cd pmix-4.2.9
+    ./configure --prefix=/opt/pmix --with-libevent > /dev/null
+    make -j$(nproc) install
+    cd /tmp && rm -rf pmix-4.2.9*
+
+    # --- OpenMPI (for compiling benchmarks; host MPI used at runtime) ---
+    cd /tmp
+    wget -q https://download.open-mpi.org/release/open-mpi/v5.0/openmpi-${OMPI_VERSION}.tar.gz
+    tar xf openmpi-${OMPI_VERSION}.tar.gz
+    cd openmpi-${OMPI_VERSION}
+    ./configure \
+        --prefix=/opt/openmpi \
+        --with-ucx=/opt/ucx \
+        --with-pmix=/opt/pmix \
+        --with-verbs \
+        --without-cuda \
+        --enable-mpi-fortran \
+        --enable-shared \
+        > /dev/null
+    make -j$(nproc) install
+    cd /tmp && rm -rf openmpi-${OMPI_VERSION}*
+
+    export PATH=/opt/openmpi/bin:/opt/ucx/bin:$PATH
+    export LD_LIBRARY_PATH=/opt/openmpi/lib:/opt/ucx/lib:/opt/pmix/lib:$LD_LIBRARY_PATH
+
+    # --- OpenBLAS ---
+    cd /tmp
+    wget -q https://github.com/OpenMathLib/OpenBLAS/releases/download/v${OPENBLAS_VERSION}/OpenBLAS-${OPENBLAS_VERSION}.tar.gz
+    tar xf OpenBLAS-${OPENBLAS_VERSION}.tar.gz
+    cd OpenBLAS-${OPENBLAS_VERSION}
+    make -j$(nproc) USE_OPENMP=1 NO_SHARED=0 TARGET=GENERIC
+    make PREFIX=/opt/openblas install
+    cd /tmp && rm -rf OpenBLAS-${OPENBLAS_VERSION}*
+
+    # --- HPL ---
+    cd /tmp
+    wget -q https://www.netlib.org/benchmark/hpl/hpl-${HPL_VERSION}.tar.gz
+    tar xf hpl-${HPL_VERSION}.tar.gz
+    cd hpl-${HPL_VERSION}
+    cat > Make.linux_openblas << 'MAKEFILE'
+ARCH         = linux_openblas
+TOPdir       = $(HOME)/hpl
+INCdir       = $(TOPdir)/include
+BINdir       = $(TOPdir)/bin/$(ARCH)
+LIBdir       = $(TOPdir)/lib/$(ARCH)
+HPLlib       = $(LIBdir)/libhpl.a
+MPdir        = /opt/openmpi
+MPinc        = -I$(MPdir)/include
+MPlib        = -L$(MPdir)/lib -lmpi
+LAdir        = /opt/openblas
+LAinc        = -I$(LAdir)/include
+LAlib        = -L$(LAdir)/lib -lopenblas
+F2CDEFS      = -DAdd__ -DF77_INTEGER=int -DStringSunStyle
+HPL_INCLUDES = -I$(INCdir) -I$(INCdir)/$(ARCH) $(LAinc) $(MPinc)
+HPL_LIBS     = $(HPLlib) $(LAlib) $(MPlib) -lm
+HPL_OPTS     =
+HPL_DEFS     = $(F2CDEFS) $(HPL_OPTS) $(HPL_INCLUDES)
+CC           = /opt/openmpi/bin/mpicc
+CCNOOPT      = $(HPL_DEFS)
+CCFLAGS      = $(HPL_DEFS) -O3 -march=native -funroll-loops -fopenmp
+LINKER       = /opt/openmpi/bin/mpif77
+LINKFLAGS    = $(CCFLAGS)
+ARCHIVER     = ar
+ARFLAGS      = r
+RANLIB       = echo
+MAKEFILE
+    HOME=/tmp/hpl-${HPL_VERSION} make arch=linux_openblas -j$(nproc)
+    mkdir -p /opt/hpl/bin
+    cp /tmp/hpl-${HPL_VERSION}/bin/linux_openblas/xhpl /opt/hpl/bin/
+    cd /tmp && rm -rf hpl-${HPL_VERSION}*
+
+    # --- HPCG ---
+    cd /tmp
+    wget -q https://github.com/hpcg-benchmark/hpcg/archive/refs/tags/HPCG-release-${HPCG_VERSION}.tar.gz
+    tar xf HPCG-release-${HPCG_VERSION}.tar.gz
+    cd hpcg-HPCG-release-${HPCG_VERSION}
+    mkdir build && cd build
+    cmake .. \
+        -DCMAKE_C_COMPILER=/opt/openmpi/bin/mpicc \
+        -DCMAKE_CXX_COMPILER=/opt/openmpi/bin/mpicxx \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DHPCG_ENABLE_OPENMP=ON
+    make -j$(nproc)
+    mkdir -p /opt/hpcg/bin
+    cp bin/xhpcg /opt/hpcg/bin/
+    cd /tmp && rm -rf hpcg-* HPCG-release-*
+
+    # --- STREAM ---
+    cd /tmp
+    wget -q https://www.cs.virginia.edu/stream/FTP/Code/stream.c
+    gcc -O3 -march=native -fopenmp \
+        -DSTREAM_ARRAY_SIZE=${STREAM_ARRAY_SIZE} \
+        -DNTIMES=20 \
+        -o /opt/stream/stream \
+        stream.c
+    mkdir -p /opt/stream
+    gcc -O3 -march=native -fopenmp \
+        -DSTREAM_ARRAY_SIZE=${STREAM_ARRAY_SIZE} \
+        -DNTIMES=20 \
+        -o /opt/stream/stream stream.c
+    rm -f stream.c
+
+    # --- OSU Micro-Benchmarks (for network latency/BW checks) ---
+    cd /tmp
+    wget -q https://mvapich.cse.ohio-state.edu/download/mvapich/osu-micro-benchmarks-7.4.tar.gz
+    tar xf osu-micro-benchmarks-7.4.tar.gz
+    cd osu-micro-benchmarks-7.4
+    ./configure \
+        --prefix=/opt/osu \
+        CC=/opt/openmpi/bin/mpicc \
+        CXX=/opt/openmpi/bin/mpicxx \
+        > /dev/null
+    make -j$(nproc) install
+    cd /tmp && rm -rf osu-micro-benchmarks*
+
+    # --- Default HPL.dat template ---
+    mkdir -p /opt/hpl/run
+    cat > /opt/hpl/run/HPL.dat.template << 'HPLDAT'
+HPLinpack benchmark input file
+Innovative Computing Laboratory, University of Tennessee
+HPL.out      output file name (if any)
+6            device out (6=stdout,7=stderr,file)
+1            # of problems sizes (N)
+__N__        Ns
+1            # of NBs
+192          NBs
+0            PMAP process mapping (0=Row-,1=Column-major)
+1            # of process grids (P x Q)
+__P__        Ps
+__Q__        Qs
+16.0         threshold
+1            # of panel fact
+2            PFACTs (0=left, 1=Crout, 2=Right)
+1            # of recursive stopping criterium
+4            NBMINs (>= 1)
+1            # of panels in recursion
+2            NDIVs
+1            # of recursive panel fact.
+1            RFACTs (0=left, 1=Crout, 2=Right)
+1            # of broadcast
+1            BCASTs (0=1rg,1=1rM,2=2rg,3=2rM,4=Lng,5=LnM)
+1            # of lookahead depth
+1            DEPTHs (>=0)
+2            SWAP (0=bin-exch,1=long,2=mix)
+64           swapping threshold
+0            L1 in (0=transposed,1=no-transposed) form
+0            U  in (0=transposed,1=no-transposed) form
+1            Equilibration (0=no,1=yes)
+8            memory alignment in double (> 0)
+HPLDAT
+
+    # --- Default HPCG input template ---
+    mkdir -p /opt/hpcg/run
+    cat > /opt/hpcg/run/hpcg.dat.template << 'HPCGDAT'
+HPCG benchmark input file
+Sandia National Laboratories; University of Tennessee, Knoxville
+__NX__ __NY__ __NZ__
+60
+HPCGDAT
+
+    # Cleanup
+    dnf -y remove wget
+    dnf clean all
+    rm -rf /tmp/*
+
+%environment
+    export PATH=/opt/openmpi/bin:/opt/ucx/bin:/opt/hpl/bin:/opt/hpcg/bin:/opt/stream:/opt/osu/libexec/osu-micro-benchmarks/mpi/collective:/opt/osu/libexec/osu-micro-benchmarks/mpi/pt2pt:$PATH
+    export LD_LIBRARY_PATH=/opt/openmpi/lib:/opt/ucx/lib:/opt/pmix/lib:/opt/openblas/lib:$LD_LIBRARY_PATH
+    export UCX_TLS=rc,ud,tcp,sm,self
+    export UCX_NET_DEVICES=all
+    export OMPI_MCA_btl=^openib
+    export OMPI_MCA_pml=ucx
+    export OMP_PROC_BIND=close
+    export OMP_PLACES=cores
+
+%runscript
+    echo "HPC CPU Benchmark Container"
+    echo "Available benchmarks: xhpl, xhpcg, stream"
+    echo "OSU benchmarks: osu_latency, osu_bw, osu_allreduce"
+    echo ""
+    echo "Usage: singularity exec [--bind /dev/infiniband] hpc-bench-cpu.sif <benchmark> [args]"
+    exec "$@"
+
+%test
+    /opt/stream/stream | grep -q "Triad" && echo "STREAM: OK"
+    test -x /opt/hpl/bin/xhpl  && echo "HPL:    OK"
+    test -x /opt/hpcg/bin/xhpcg && echo "HPCG:   OK"
